@@ -1,0 +1,9 @@
+assets/
+renders/
+*.blend
+*.blend1
+web/node_modules/
+web/dist/
+server/.venv/
+**/__pycache__/
+docs/
