@@ -3,3 +3,9 @@ renders/
 *.blend
 *.blend1
 __pycache__/
+
+web/node_modules/
+web/dist/
+server/.venv/
+server/**/__pycache__/
+*.sqlite
