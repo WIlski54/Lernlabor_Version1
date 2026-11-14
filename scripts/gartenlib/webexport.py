@@ -585,3 +585,46 @@ def _wiese(ziel):
     k.data.materials.append(m)
     exportieren([k], os.path.join(ziel, "wiese.glb"))
     return {"ok": True, "dreiecke": _dreiecke(k.data)}
+
+
+WAND_SAMMLUNGEN_NAMEN = ("Haus_EG", "Haus_OG", "Fluegel", "Vordach_Stuetzen", "Carport_Stuetzen", "Feuerschale",
+                         "Feuerschale_Fuss")
+BODEN_NAMEN = ("Rasen", "Wiese", "Hof_Platten", "Weg_Fluegel", "Carport_Boden", "Terrasse", "Labor_Boden")
+
+
+def _box_aus_bbox(bm, o):
+    ecken = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    mn = Vector((min(e.x for e in ecken), min(e.y for e in ecken), min(e.z for e in ecken)))
+    mx = Vector((max(e.x for e in ecken), max(e.y for e in ecken), max(e.z for e in ecken)))
+    from .util import bm_box
+    bm_box(bm, mx - mn, (mn + mx) / 2)
+
+
+@teil("kollision")
+def _kollision(ziel):
+    from .util import mesh_aus_bmesh
+    from .fassade import _rohr
+    dg = bpy.context.evaluated_depsgraph_get()
+    waende = [kopie(bpy.data.objects[n], dg) for n in WAND_SAMMLUNGEN_NAMEN if n in bpy.data.objects]
+    waende += [kopie(o, dg) for o in bpy.data.objects
+               if o.type == "MESH" and (o.name.startswith(("Tuerblatt_", "Glas_")) or
+                                        (o.name.startswith("Hecke_") and o.name.endswith("_Kern")))]
+    bm = bmesh.new()                                    # Möbel, Sessel, Poller als Quader; Stämme als Zylinder
+    for o in bpy.data.collections["03_Innenraum"].all_objects:
+        if o.type == "MESH" and o.name.startswith("Labor_") and not o.name.startswith(("Labor_Boden", "Labor_Lichtpaneele")):
+            _box_aus_bbox(bm, o)
+    for o in bpy.data.collections["04_Hardscape"].all_objects:
+        if o.type in ("MESH", "CURVE") and o.name.startswith(("Sessel_", "Poller_")):
+            _box_aus_bbox(bm, o)
+    for name, _a, ort, _h, _s in L.BAEUME:
+        _rohr(bm, Vector((ort[0], ort[1], 0)), Vector((ort[0], ort[1], 3.0)), 0.28, 10)
+    hilfen = mesh_aus_bmesh("WEB_Kollision_Hilfen", bm, TMP)
+    waende.append(hilfen)
+    w = vereinen("Waende", waende)
+    boden = vereinen("Boden", [kopie(bpy.data.objects[n], dg) for n in BODEN_NAMEN if n in bpy.data.objects] +
+                     [kopie(o, dg) for o in bpy.data.objects if o.name.startswith("Trittplatte_")])
+    for o in (w, boden):
+        o.data.materials.clear()
+    exportieren([w, boden], os.path.join(ziel, "kollision.glb"), materialien=False)
+    return {"waende_dreiecke": sum(len(p.vertices) - 2 for p in w.data.polygons),
+            "boden_dreiecke": sum(len(p.vertices) - 2 for p in boden.data.polygons)}
