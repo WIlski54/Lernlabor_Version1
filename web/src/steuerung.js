@@ -1,6 +1,9 @@
 import { joystickVektor } from './logik/joystick.js';
 
-/** PC: WASD + Maus (Pointer Lock), Shift schneller. iPad: Joystick links, Wischen rechts. */
+/**
+ * PC: WASD + Maus (Pointer Lock), Shift schneller. iPad: Joystick links, Wischen rechts.
+ * Maus und Touch sind immer beide aktiv (Touch-PCs, Smartboards mit Stift und Finger).
+ */
 export class Steuerung {
   constructor(canvas, joystickEl, knaufEl, yaw = 0) {
     this.yaw = yaw;
@@ -9,17 +12,21 @@ export class Steuerung {
     this.joy = { x: 0, y: 0 };
     this.joyFinger = null;
     this.blickFinger = null;
-    this.touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+    // Nur für Hinweistext und ob der Joystick von Anfang an sichtbar ist – schaltet nichts ab
+    this.touch = matchMedia('(pointer: coarse)').matches;
     this.joystickEl = joystickEl;
     this.knaufEl = knaufEl;
     addEventListener('keydown', (e) => this.tasten.add(e.code));
     addEventListener('keyup', (e) => this.tasten.delete(e.code));
-    // Ohne Pointer Lock (z. B. eingebettet): Umschauen durch Ziehen mit der linken Maustaste
+    // Fenster verlässt den Fokus (Alt+Tab, Tab-Wechsel): keyup kommt nie an → sonst läuft man weiter
+    addEventListener('blur', () => this.loslassen());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.loslassen(); });
+    // Ohne Pointer Lock (z. B. eingebettet oder nach Touch-Start): Umschauen durch Ziehen mit der linken Maustaste
     this.ziehen = false;
-    canvas.addEventListener('mousedown', (e) => { if (e.button === 0 && !this.touch) this.ziehen = true; });
+    canvas.addEventListener('mousedown', (e) => { if (e.button === 0) this.ziehen = true; });
     addEventListener('mouseup', () => { this.ziehen = false; });
     canvas.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement !== canvas && !(this.ziehen && !this.touch)) return;
+      if (document.pointerLockElement !== canvas && !this.ziehen) return;
       this.drehen(e.movementX * 0.0022, e.movementY * 0.0022);
     });
     canvas.addEventListener('touchstart', (e) => this.touchStart(e), { passive: false });
@@ -33,8 +40,14 @@ export class Steuerung {
     this.pitch = Math.max(-1.3, Math.min(1.3, this.pitch - dy));
   }
 
+  loslassen() {
+    this.tasten.clear();
+    this.ziehen = false;
+  }
+
   touchStart(e) {
-    e.preventDefault();
+    e.preventDefault(); // verhindert auch die nachgeahmten Maus-Ereignisse → kein Doppel-Drehen
+    this.joystickEl.hidden = false; // Touch auf einem „Maus“-Gerät: Joystick ab jetzt zeigen
     for (const t of e.changedTouches) {
       if (t.clientX < innerWidth * 0.45 && this.joyFinger === null) {
         this.joyFinger = { id: t.identifier, x0: t.clientX, y0: t.clientY };

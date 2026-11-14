@@ -79,20 +79,38 @@ let fallTempo = 0;
 
 const steuerung = new Steuerung(canvas, document.getElementById('joystick'), document.getElementById('joystick-knauf'), start.yaw);
 const startEl = document.getElementById('start');
-document.getElementById('start-hinweis').textContent = steuerung.touch
+const hinweisEl = document.getElementById('start-hinweis');
+const HINWEIS = steuerung.touch
   ? 'Links ziehen = gehen · rechts wischen = umschauen'
   : 'W A S D = gehen · Maus = umschauen · Shift = schneller · Esc = Pause';
+hinweisEl.textContent = HINWEIS;
 startEl.hidden = false;
-document.getElementById('start-knopf').addEventListener('click', () => {
+// Zeigertyp des letzten Klicks/Antippens – „click“ ist nicht überall ein PointerEvent (ältere Safari),
+// und per Tastatur (Enter) ist pointerType leer
+let zeigerTyp = steuerung.touch ? 'touch' : 'mouse';
+addEventListener('pointerdown', (e) => { zeigerTyp = e.pointerType || zeigerTyp; }, true);
+let lockFehler = 0;
+document.getElementById('start-knopf').addEventListener('click', (e) => {
   startEl.hidden = true;
-  if (steuerung.touch) document.getElementById('joystick').hidden = false;
-  else {
-    try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* z. B. eingebettetes Fenster: Maus-Ziehen statt Pointer Lock */ }
+  const typ = e.pointerType || zeigerTyp;
+  // Pointer Lock nur bei echter Maus – nach Finger/Stift (Touch-PC, Smartboard) bleibt der Zeiger frei
+  if (typ === 'mouse') {
+    try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* Fehler meldet pointerlockerror */ }
     document.getElementById('fadenkreuz').hidden = false;
   }
+  if (typ === 'touch' || steuerung.touch) document.getElementById('joystick').hidden = false;
 });
 document.addEventListener('pointerlockchange', () => {
-  if (!abgebrochen && !steuerung.touch && document.pointerLockElement !== canvas) startEl.hidden = false;
+  if (document.pointerLockElement === canvas) { lockFehler = 0; hinweisEl.textContent = HINWEIS; return; }
+  if (!abgebrochen) startEl.hidden = false; // Esc: Pause
+});
+document.addEventListener('pointerlockerror', () => {
+  // z. B. Klick zu kurz nach Esc (Chrome) → Start-Overlay erneut anbieten. Scheitert es gleich wieder
+  // (eingebettetes Fenster ohne Erlaubnis), bleibt es beim Umschauen mit gedrückter Maustaste.
+  lockFehler += 1;
+  if (abgebrochen || lockFehler > 1) return;
+  hinweisEl.textContent = 'Mauszeiger konnte nicht eingefangen werden – bitte noch einmal klicken (oder mit gedrückter Maustaste ziehen)';
+  startEl.hidden = false;
 });
 
 const leistung = new Leistung(document.getElementById('fps'), renderer);
