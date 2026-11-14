@@ -310,3 +310,278 @@ def _bake(ziel):
     erg["glas"] = glas_export(ziel)
     erg["whiteboard"] = whiteboard_export(ziel)
     return erg
+
+
+# Vereinfachung je Prototyp (Anteil der Dreiecke, die bleiben) und Ausdünnung der Instanzen
+# (Rasenstücke kommen nur aus den Beeten mit Bib_Halme; den Rasen selbst zeichnet die Web-App als Gras.)
+VEREINFACHUNG = {"Ziergras": 0.25, "Staude": 0.35, "Kiefernpolster": 0.08, "Rasenstueck_Lauf": 0.5,
+                 "Heckenballen_Lauf": 0.2}
+AUSDUENNEN = {"Heckenballen_Lauf": 6}           # jede 6. Hecken-Instanz (Budget: ~1 Mio. Dreiecke für Pflanzen + Bäume)
+IGNORIEREN = ("fern_", "shrub_", "pine_sapling")  # Poly-Haven-Sträucher (Alpha-Texturen) im Web weglassen
+# Bäume: Blattmenge (Faktor auf blatt_dichte), Blattgröße (Faktor auf ARTEN["blatt"]), kleinste Röhrenfläche
+# in m² (dünnere Zweige entfallen – jede Aströhre ist eine eigene Insel, Decimate kann sie kaum verkleinern)
+# und Anteil der verbleibenden Holz-Dreiecke. Die Kulisse (34–52 m entfernt, im Nebel) bekommt wenige,
+# sehr große Blätter.
+BAUM_WEB = {"garten": {"blatt_faktor": 0.12, "blatt_skala": 2.2, "zweig_min": 0.01, "holz": 0.4},
+            "kulisse": {"blatt_faktor": 0.025, "blatt_skala": 4.5, "zweig_min": 0.1, "holz": 0.3}}
+
+
+def _praefix(name):
+    for p in VEREINFACHUNG:
+        if name.startswith(p):
+            return p
+    return None
+
+
+def _dreiecke(me):
+    return sum(len(p.vertices) - 2 for p in me.polygons)
+
+
+def _dezimieren(o, anteil):
+    """Decimate (Collapse) direkt anwenden – vor dem Vereinen nötig, join übernimmt keine Modifier."""
+    if anteil >= 1.0:
+        return
+    dm = o.modifiers.new("Vereinfachen", "DECIMATE")
+    dm.ratio = anteil
+    with bpy.context.temp_override(object=o, active_object=o):
+        bpy.ops.object.modifier_apply(modifier=dm.name)
+
+
+def _zweige_entfernen(o, flaeche_min):
+    """Löscht zusammenhängende Röhren (Inseln) mit weniger als flaeche_min m² (Mesh-Koordinaten)."""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    gesehen, weg = set(), []
+    for f in bm.faces:
+        if f in gesehen:
+            continue
+        stapel, insel = [f], []
+        gesehen.add(f)
+        while stapel:
+            g = stapel.pop()
+            insel.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h not in gesehen:
+                        gesehen.add(h)
+                        stapel.append(h)
+        if sum(x.calc_area() for x in insel) < flaeche_min:
+            weg += insel
+    bmesh.ops.delete(bm, geom=weg, context="FACES")
+    bm.to_mesh(o.data)
+    bm.free()
+
+
+def _rampenfarbe(m):
+    for n in m.node_tree.nodes if m and m.use_nodes else []:
+        if n.type == "VALTORGB":
+            return tuple(n.color_ramp.evaluate(0.5))[:3]
+        if n.type == "BSDF_PRINCIPLED" and not n.inputs["Base Color"].is_linked:
+            return tuple(n.inputs["Base Color"].default_value)[:3]
+    return (0.1, 0.2, 0.05)
+
+
+def _einfache_materialien(o):
+    neu = []
+    for m in o.data.materials:
+        wm = bpy.data.materials.new(f"WEB_P_{m.name if m else 'leer'}")
+        b = wm.node_tree.nodes.get("Principled BSDF")
+        b.inputs["Base Color"].default_value = (*_rampenfarbe(m), 1.0)
+        b.inputs["Roughness"].default_value = 0.8
+        neu.append(wm)
+    o.data.materials.clear()
+    for wm in neu:
+        o.data.materials.append(wm)
+
+
+def _instanzdaten(dg, filter_fn):
+    """{prototypname: [pos(3), quat(4), skala(1)] …} in Three.js-Koordinaten."""
+    daten = {}
+    zaehler = {}
+    for inst in dg.object_instances:
+        if not inst.is_instance or inst.parent is None:
+            continue
+        if not filter_fn(inst.parent.original):
+            continue
+        name = inst.object.original.name
+        if name.startswith(IGNORIEREN) or _praefix(name) is None:
+            continue
+        zaehler[name] = zaehler.get(name, 0) + 1
+        if zaehler[name] % AUSDUENNEN.get(_praefix(name), 1):
+            continue
+        loc, rot, sk = inst.matrix_world.decompose()
+        daten.setdefault(name, []).append(drei(loc) + [round(rot.x, 5), round(rot.z, 5), round(-rot.y, 5),
+                                                         round(rot.w, 5), round(sk.x, 4)])
+    return daten
+
+
+def _instanzen_schreiben(daten, ziel, basisname):
+    index, puffer, offset = {}, bytearray(), 0
+    for name, liste in sorted(daten.items()):
+        for werte in liste:
+            puffer += struct.pack("<8f", *werte)
+        index[name] = {"offset": offset, "anzahl": len(liste)}
+        offset += len(liste)
+    with open(os.path.join(ziel, f"{basisname}.bin"), "wb") as f:
+        f.write(puffer)
+    with open(os.path.join(ziel, f"{basisname}.json"), "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=1)
+    return {k: v["anzahl"] for k, v in index.items()}
+
+
+def _prototypen_exportieren(namen, ziel, dateiname):
+    """Kopien der Bibliotheksobjekte unter dem Originalnamen (= Schlüssel der Instanzdaten) exportieren."""
+    protos, dreiecke, originale = [], {}, []
+    for name in namen:
+        orig = bpy.data.objects[name]
+        k = bpy.data.objects.new(f"WEB_{name}", orig.data.copy())
+        bpy.data.collections[TMP].objects.link(k)
+        _dezimieren(k, VEREINFACHUNG.get(_praefix(name), 1.0))
+        _einfache_materialien(k)
+        orig.name = f"{name}_orig"
+        k.name = name
+        originale.append((orig, k, name))
+        dreiecke[name] = _dreiecke(k.data)
+        protos.append(k)
+    exportieren(protos, os.path.join(ziel, dateiname))
+    for orig, k, name in originale:                  # Namen zurücksetzen
+        k.name = f"WEB_{name}"
+        orig.name = name
+    return dreiecke
+
+
+@teil("pflanzen")
+def _pflanzen(ziel):
+    dg = bpy.context.evaluated_depsgraph_get()
+    daten = _instanzdaten(dg, lambda p: p.name.startswith(("Pflanzung_", "Hecke_")))
+    anz = _instanzen_schreiben(daten, ziel, "pflanzen_instanzen")
+    dreiecke = _prototypen_exportieren(sorted(daten), ziel, "pflanzen.glb")
+    return {"instanzen": anz, "dreiecke": dreiecke,
+            "summe_instanziert": sum(dreiecke[n] * anz[n] for n in anz)}
+
+
+def _srgb(c):
+    c = np.clip(c, 0.0, 1.0)
+    return np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1 / 2.4) - 0.055)
+
+
+def _blatttextur(name, form, farbe, pfad, n=128):
+    """Blattform als RGBA-PNG (Alpha = Blattumriss), passend zu den UVs der Baum-Blätter (u quer, v längs).
+    farbe ist linear; das 8-Bit-Bild speichert sRGB (pixels eines Byte-Bildes werden nicht umgerechnet)."""
+    v, u = np.mgrid[0:n, 0:n] / (n - 1)
+    cx = 2 * u - 1
+    if form == "ahorn":
+        cy = 2 * v - 0.9
+        r = np.sqrt(cx ** 2 + cy ** 2)
+        w = np.arctan2(cx, cy)
+        maske = r < 0.35 + 0.6 * np.abs(np.cos(2.5 * w)) ** 3
+    else:
+        maske = np.abs(cx) < np.sin(np.pi * np.clip(v, 0, 1) ** 0.7) * 0.95
+    ader = np.exp(-(cx / 0.05) ** 2) * 0.25
+    px = np.zeros((n, n, 4), dtype=np.float32)
+    for k in range(3):
+        px[:, :, k] = _srgb(farbe[k] * (0.85 + 0.3 * v) * (1 - ader))
+    px[:, :, 3] = maske.astype(np.float32)
+    img = bpy.data.images.new(name, n, n, alpha=True)
+    img.pixels.foreach_set(px.ravel())
+    img.filepath_raw = pfad
+    img.file_format = "PNG"
+    img.save()
+    return img
+
+
+def _blattmaterial(name, bild):
+    m = bpy.data.materials.new(f"WEB_Blatt_{name}")
+    b = m.node_tree.nodes.get("Principled BSDF")
+    t = m.node_tree.nodes.new("ShaderNodeTexImage")
+    t.image = bild
+    m.node_tree.links.new(t.outputs["Color"], b.inputs["Base Color"])
+    m.node_tree.links.new(t.outputs["Alpha"], b.inputs["Alpha"])
+    return m
+
+
+def _hoehe_roh(*objekte):
+    """Höchster Punkt in den (unskalierten) Mesh-Daten von Stamm und Laub."""
+    return max(max((v.co.z for v in o.data.vertices), default=0.0) for o in objekte)
+
+
+@teil("baeume")
+def _baeume(ziel):
+    from . import baeume as B
+    alt = {k: dict(v) for k, v in B.ARTEN.items()}
+    def blattgroesse(faktor):                             # weniger, dafür größere Blätter
+        for k, art in B.ARTEN.items():
+            art["blatt"] = (alt[k]["blatt"][0] * faktor, alt[k]["blatt"][1] * faktor)
+
+    try:
+        bilder = {"birke": _blatttextur("blatt_birke", "birke", (0.12, 0.2, 0.05), os.path.join(ziel, "blatt_birke.png")),
+                  "ahorn": _blatttextur("blatt_ahorn", "ahorn", (0.3, 0.3, 0.07), os.path.join(ziel, "blatt_ahorn.png"))}
+        laub = {a: _blattmaterial(a, b) for a, b in bilder.items()}
+        rinde = {"birke": bpy.data.materials.new("WEB_Rinde_birke"), "ahorn": bpy.data.materials.new("WEB_Rinde_ahorn")}
+        rinde["birke"].node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.75, 0.73, 0.68, 1)
+        rinde["ahorn"].node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.22, 0.2, 0.17, 1)
+        G, K = BAUM_WEB["garten"], BAUM_WEB["kulisse"]
+        objekte, garten = [], {}
+        blattgroesse(G["blatt_skala"])
+        for name, art, ort, hoehe, seed in L.BAEUME:
+            B.baum(f"WEBB_{name}", art, ort, hoehe, seed, laub[art], rinde[art], blatt_faktor=G["blatt_faktor"],
+                   sammlung=TMP)
+            stamm, laub_o = bpy.data.objects[f"WEBB_{name}"], bpy.data.objects[f"WEBB_{name}_Laub"]
+            _zweige_entfernen(stamm, G["zweig_min"])
+            _dezimieren(stamm, G["holz"])
+            garten[f"WEBB_{name}"] = _dreiecke(stamm.data) + _dreiecke(laub_o.data)
+            objekte += [stamm, laub_o]
+        protos = []
+        blattgroesse(K["blatt_skala"])
+        for name, art, hoehe, seed in L.KULISSE["vorlagen"]:
+            B.baum(f"WEBK_{name}", art, (0.0, 0.0), hoehe, seed, laub[art], rinde[art], blatt_faktor=K["blatt_faktor"],
+                   sammlung=TMP)
+            protos.append(name)
+    finally:
+        B.ARTEN.clear()
+        B.ARTEN.update(alt)
+    # Kulisse: Instanzen aus den vorhandenen Kulissenbäumen (Vorlage über die geteilten Mesh-Daten).
+    # Der Web-Prototyp hat Skalierung 1; seine Rohhöhe weicht von der Vorlage ab (anderer Zufallsverlauf
+    # durch weniger Blätter), daher wird die Instanzskalierung um hoehe_vorlage / hoehe_web korrigiert.
+    korrektur = {}
+    for name in protos:
+        korrektur[name] = _hoehe_roh(bpy.data.objects[name], bpy.data.objects[f"{name}_Laub"]) / _hoehe_roh(
+            bpy.data.objects[f"WEBK_{name}"], bpy.data.objects[f"WEBK_{name}_Laub"])
+    vorlage_von_mesh = {bpy.data.objects[n].data.name: n for n, *_ in L.KULISSE["vorlagen"]}
+    daten = {}
+    for o in bpy.data.collections["05f_Kulisse"].objects:
+        if o.name.endswith("_Laub") or o.data.name not in vorlage_von_mesh:
+            continue
+        vorlage = vorlage_von_mesh[o.data.name]
+        loc, rot, sk = o.matrix_world.decompose()
+        daten.setdefault(f"WEBK_{vorlage}", []).append(
+            drei(loc) + [round(rot.x, 5), round(rot.z, 5), round(-rot.y, 5), round(rot.w, 5),
+                         round(sk.x * korrektur[vorlage], 4)])
+    anz = _instanzen_schreiben(daten, ziel, "baeume_instanzen")
+    kulisse, dreiecke = [], {}
+    for name in protos:                                   # Stamm + Laub zu einem Prototyp vereinen
+        stamm, laub_o = bpy.data.objects[f"WEBK_{name}"], bpy.data.objects[f"WEBK_{name}_Laub"]
+        _zweige_entfernen(stamm, K["zweig_min"])
+        _dezimieren(stamm, K["holz"])
+        laub_o.parent = None
+        for o in (stamm, laub_o):                         # Prototyp im Ursprung, ohne Drehung, Skalierung 1
+            o.location, o.rotation_euler, o.scale = (0, 0, 0), (0, 0, 0), (1, 1, 1)
+        p = vereinen(f"WEBK_{name}", [stamm, laub_o])
+        dreiecke[p.name] = _dreiecke(p.data)
+        kulisse.append(p)
+    exportieren(objekte + kulisse, os.path.join(ziel, "baeume.glb"))
+    return {"gartenbaeume": garten, "kulisse_instanzen": anz, "kulisse_dreiecke": dreiecke,
+            "hoehenkorrektur": {k: round(v, 3) for k, v in korrektur.items()},
+            "summe": sum(garten.values()) + sum(dreiecke[n] * anz[n] for n in anz)}
+
+
+@teil("wiese")
+def _wiese(ziel):
+    dg = bpy.context.evaluated_depsgraph_get()
+    k = kopie(bpy.data.objects["Wiese"], dg)
+    k.data.materials.clear()
+    m = bpy.data.materials.new("WEB_Wiese")
+    m.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.09, 0.16, 0.04, 1)
+    k.data.materials.append(m)
+    exportieren([k], os.path.join(ziel, "wiese.glb"))
+    return {"ok": True, "dreiecke": _dreiecke(k.data)}
