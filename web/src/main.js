@@ -24,12 +24,46 @@ addEventListener('resize', () => {
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('/sw.js');
 
-const fuellung = document.getElementById('lade-fuellung');
-const welt = await ladeWelt(szene, renderer, (a, t) => {
-  fuellung.style.width = `${Math.round(a * 100)}%`;
-  document.getElementById('lade-text').textContent = t;
+const ladeEl = document.getElementById('lade');
+let abgebrochen = false; // nach einer Fehlermeldung bleibt sie stehen (kein Start-Overlay darüber)
+
+/** Ersetzt den Ladebildschirm durch eine Meldung mit „Neu laden“-Knopf. */
+function zeigeMeldung(text) {
+  abgebrochen = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  for (const id of ['start', 'joystick', 'fadenkreuz']) document.getElementById(id).hidden = true;
+  const meldung = document.createElement('div');
+  meldung.className = 'meldung';
+  meldung.textContent = text;
+  const knopf = document.createElement('button');
+  knopf.className = 'neu-laden';
+  knopf.textContent = 'Neu laden';
+  knopf.addEventListener('click', () => location.reload());
+  ladeEl.replaceChildren(ladeEl.querySelector('.titel') ?? '', meldung, knopf);
+  ladeEl.hidden = false;
+}
+
+// iPad: läuft der Grafikspeicher über, verliert Safari den WebGL-Kontext → Meldung statt schwarzem Bild
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  console.error('WebGL-Kontext verloren');
+  zeigeMeldung('Grafikspeicher voll – bitte Seite neu laden');
 });
-document.getElementById('lade').hidden = true;
+
+const fuellung = document.getElementById('lade-fuellung');
+let welt;
+try {
+  welt = await ladeWelt(szene, renderer, (a, t) => {
+    fuellung.style.width = `${Math.round(a * 100)}%`;
+    document.getElementById('lade-text').textContent = t;
+  });
+} catch (fehler) {
+  console.error(fehler);
+  if (!abgebrochen) zeigeMeldung('Laden fehlgeschlagen – bitte neu laden');
+  await new Promise(() => {}); // Modul hier anhalten: ohne Welt gibt es nichts zu starten
+}
+if (abgebrochen) await new Promise(() => {}); // Kontext ging während des Ladens verloren
+ladeEl.hidden = true;
 
 const { konfig } = welt;
 const augen = konfig.augenhoehe;
@@ -58,7 +92,7 @@ document.getElementById('start-knopf').addEventListener('click', () => {
   }
 });
 document.addEventListener('pointerlockchange', () => {
-  if (!steuerung.touch && document.pointerLockElement !== canvas) startEl.hidden = false;
+  if (!abgebrochen && !steuerung.touch && document.pointerLockElement !== canvas) startEl.hidden = false;
 });
 
 const leistung = new Leistung(document.getElementById('fps'), renderer);

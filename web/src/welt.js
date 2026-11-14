@@ -5,6 +5,15 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 const W = '/welt/';
 const WHITEBOARD_FARBE = 0xf4f4f2;
 
+/** fetch mit Statusprüfung: Fehlerseiten (404, 500 …) nicht als Daten weiterreichen. */
+async function holen(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Laden fehlgeschlagen: ${url} (HTTP ${r.status})`);
+  return r;
+}
+const holeJson = (url) => holen(url).then((r) => r.json());
+const holePuffer = (url) => holen(url).then((r) => r.arrayBuffer());
+
 function laderMit(manager) {
   const l = new GLTFLoader(manager);
   l.setMeshoptDecoder(MeshoptDecoder);
@@ -34,8 +43,8 @@ function pflanzenMaterial(alt) {
  */
 async function instanzen(szene, gltf, name) {
   const [index, puffer] = await Promise.all([
-    fetch(`${W}${name}.json`).then((r) => r.json()),
-    fetch(`${W}${name}.bin`).then((r) => r.arrayBuffer()),
+    holeJson(`${W}${name}.json`),
+    holePuffer(`${W}${name}.bin`),
   ]);
   const f = new Float32Array(puffer);
   const m = new THREE.Matrix4();
@@ -74,7 +83,7 @@ export async function ladeWelt(szene, renderer, fortschritt) {
   manager.onProgress = (_u, geladen, gesamt) => fortschritt(geladen / gesamt, 'Lade Welt …');
   const lader = laderMit(manager);
   const glb = (n) => lader.loadAsync(`${W}${n}.glb`);
-  const konfig = await fetch(`${W}welt.json`).then((r) => r.json());
+  const konfig = await holeJson(`${W}welt.json`);
 
   const himmel = await new THREE.TextureLoader(manager).loadAsync(`${W}himmel.jpg`);
   himmel.mapping = THREE.EquirectangularReflectionMapping;
@@ -125,8 +134,8 @@ export async function ladeWelt(szene, renderer, fortschritt) {
   await instanzen(szene, baeume, 'baeume_instanzen');
 
   const [maskeKopf, maskeDaten] = await Promise.all([
-    fetch(`${W}rasenmaske.json`).then((r) => r.json()),
-    fetch(`${W}rasenmaske.bin`).then((r) => r.arrayBuffer()),
+    holeJson(`${W}rasenmaske.json`),
+    holePuffer(`${W}rasenmaske.bin`),
   ]);
   return {
     konfig, whiteboard,
