@@ -12,6 +12,8 @@ SAMMLUNGEN = [
     ("98_Masken", None), ("Maske_Rasen", "98_Masken"), ("Maske_Beet", "98_Masken"),
     ("99_Bibliothek", None), ("Bib_Halme", "99_Bibliothek"), ("Bib_Graeser", "99_Bibliothek"),
     ("Bib_Stauden", "99_Bibliothek"), ("Bib_Polster", "99_Bibliothek"), ("Bib_Kiefer", "99_Bibliothek"),
+    ("01b_Wiese", "01_Gelaende"), ("01c_Heckenkern", "01_Gelaende"), ("05g_Hecke", "05_Pflanzen"),
+    ("Bib_Heckenblatt", "99_Bibliothek"),
 ]
 
 
@@ -59,7 +61,7 @@ def render_einrichten():
 def struktur():
     for name, eltern in SAMMLUNGEN:
         collection(name, eltern)
-    for maske, kinder in (("Maske_Rasen", ("02_Architektur", "04_Hardscape", "01a_Beete")),
+    for maske, kinder in (("Maske_Rasen", ("02_Architektur", "04_Hardscape", "01a_Beete", "01c_Heckenkern")),
                           ("Maske_Beet", ("02_Architektur", "04_Hardscape"))):
         ziel = bpy.data.collections[maske]
         for kind in kinder:

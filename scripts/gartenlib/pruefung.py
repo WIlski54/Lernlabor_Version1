@@ -228,3 +228,49 @@ def baeume():
 def qualitaetsprobe():
     p = pfad("renders", "qualitaetsprobe.png")
     return _e([] if os.path.exists(p) else ["renders/qualitaetsprobe.png fehlt"])
+
+
+def kulisse():
+    from . import layout as L
+    f = []
+    if "Wiese" not in bpy.data.objects:
+        f.append("Wiese fehlt")
+    hecken = [o for o in bpy.data.objects if o.name.startswith("Hecke_") and o.name.endswith("_Laub")]
+    if len(hecken) < len(L.HECKEN):
+        f.append(f"nur {len(hecken)} Hecken mit Laub")
+    baeume = [o for o in bpy.data.collections["05f_Kulisse"].objects
+              if o.name.startswith("Kulisse_") and not o.name.endswith("_Laub")]
+    if len(baeume) < L.KULISSE["anzahl"]:
+        f.append(f"nur {len(baeume)} Kulissenbäume")
+    return _e(f)
+
+
+def innenraum():
+    from . import layout as L
+    f = [f"fehlt {n}" for n in ("Innen_Boden", "Innen_Kueche", "Kamera_Innen", "Innen_GI", "Innen_Reflexion")
+         if n not in bpy.data.objects]
+    moebel = [o for o in bpy.data.objects if o.name.startswith("Moebel_")]
+    if len(moebel) < 6:
+        f.append(f"nur {len(moebel)} Möbel")
+    for name, *_ in L.INNEN["lichter"]:
+        if name not in bpy.data.objects:
+            f.append(f"fehlt {name}")
+    tuer = architektur()
+    if not tuer["ok"]:
+        f += tuer["fehler"]
+    return _e(f, moebel=len(moebel))
+
+
+def lauf():
+    f = []
+    wn = bpy.context.preferences.inputs.walk_navigation
+    if not wn.use_gravity:
+        f.append("Schwerkraft beim Laufen aus")
+    if abs(wn.view_height - 1.7) > 0.01:
+        f.append("Augenhöhe nicht 1,70 m")
+    if "Kamera_Laufen" not in bpy.data.objects:
+        f.append("Kamera_Laufen fehlt")
+    fps = bpy.data.objects["Steuerung"].get("fps_laufen", 0.0)
+    if fps < 25.0:
+        f.append(f"nur {fps:.1f} fps im Modus Laufen")
+    return _e(f, fps=fps)

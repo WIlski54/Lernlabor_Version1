@@ -164,7 +164,7 @@ def graeser_bibliothek():
     m_gras = pflanzen_material("M_Ziergras", [(0.0, (0.05, 0.10, 0.025)), (0.45, (0.11, 0.16, 0.05)),
                                               (0.8, (0.20, 0.21, 0.09)), (1.0, (0.34, 0.30, 0.15))],
                                durchscheinend=0.4, spitze=((0.42, 0.38, 0.22), 0.6))
-    m_rispe = pflanzen_material("M_Grasbluete", [(0.0, (0.45, 0.40, 0.32)), (1.0, (0.64, 0.59, 0.49))],
+    m_rispe = pflanzen_material("M_Grasbluete", [(0.0, (0.36, 0.32, 0.25)), (1.0, (0.52, 0.47, 0.38))],
                                 durchscheinend=0.6, rauheit=0.6)
     rnd = random.Random(11)
     for k in range(5):

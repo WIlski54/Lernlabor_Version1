@@ -89,3 +89,19 @@ BAEUME = [
     ("Baum_Birke_2", "birke", (2.0, 10.0), 12.5, 2),
     ("Baum_Birke_3", "birke", (-4.0, 8.0), 10.0, 3),
 ]
+
+# ---------------------------------------------------------------- Teil 2: Kulisse
+# Hecken als Mittellinien ((x0, y0), (x1, y1)); Lücke im Süden für den Weg am Seitenflügel
+HECKEN = [
+    ((-23.5, 25.5), (15.5, 25.5)),
+    ((-23.5, -21.5), (-23.5, 25.5)),
+    ((-23.5, -21.5), (2.0, -21.5)),
+    ((15.5, -21.5), (15.5, 25.5)),
+]
+HECKE_MASS = {"hoehe": 1.8, "tiefe": 0.8}
+WIESE = {"mitte": (-4.0, 2.0), "halbe_breite": 60.0}
+KULISSE = {
+    "anzahl": 26, "r_min": 34.0, "r_max": 52.0, "mitte": (-4.0, 2.0), "seed": 9, "blatt_faktor": 0.45,
+    "vorlagen": [("Kulisse_Birke_A", "birke", 15.0, 11), ("Kulisse_Birke_B", "birke", 13.0, 12),
+                 ("Kulisse_Ahorn_A", "ahorn", 12.0, 13), ("Kulisse_Ahorn_B", "ahorn", 14.0, 14)],
+}

@@ -68,9 +68,10 @@ def _blatt(bm, uv, c, richtung, groesse, rnd):
 
 
 class _Bauer:
-    def __init__(self, art, rnd):
+    def __init__(self, art, rnd, blatt_faktor=1.0):
         self.a = ARTEN[art]
         self.rnd = rnd
+        self.blatt_faktor = blatt_faktor
         self.holz = bmesh.new()
         self.laub = bmesh.new()
         self.uv = self.laub.loops.layers.uv.new("UVMap")
@@ -94,7 +95,7 @@ class _Bauer:
 
         stufen = self.a["stufen"]
         if stufe >= len(stufen) - 1:  # Blätter an den beiden feinsten Stufen
-            for _ in range(int(laenge * self.a["blatt_dichte"])):
+            for _ in range(int(laenge * self.a["blatt_dichte"] * self.blatt_faktor)):
                 t = rnd.uniform(0.25, 1.0)
                 idx = min(int(t * n), n - 1)
                 p = punkte[idx].lerp(punkte[idx + 1], t * n - idx)
@@ -165,15 +166,15 @@ def rinde_birke():
     return m
 
 
-def baum(name, art, ort, hoehe, seed, laub_mat, rinde_mat):
+def baum(name, art, ort, hoehe, seed, laub_mat, rinde_mat, blatt_faktor=1.0, sammlung="05e_Baeume"):
     rnd = random.Random(seed * 101 + 7)
     a = ARTEN[art]
-    bauer = _Bauer(art, rnd)
+    bauer = _Bauer(art, rnd, blatt_faktor)
     stamm_l = hoehe * a["stamm"][0]
     bauer.ast(Vector((0, 0, -0.1)), Vector((rnd.uniform(-0.05, 0.05), rnd.uniform(-0.05, 0.05), 1)).normalized(),
               stamm_l, hoehe * a["stamm"][1], 0)
-    obj = mesh_aus_bmesh(name, bauer.holz, "05e_Baeume", mats=[rinde_mat])
-    laub = mesh_aus_bmesh(f"{name}_Laub", bauer.laub, "05e_Baeume", eltern=obj, mats=[laub_mat])
+    obj = mesh_aus_bmesh(name, bauer.holz, sammlung, mats=[rinde_mat])
+    laub = mesh_aus_bmesh(f"{name}_Laub", bauer.laub, sammlung, eltern=obj, mats=[laub_mat])
     for p in obj.data.polygons:
         p.use_smooth = True
     hmax = max(max(v.co.z for v in obj.data.vertices), max((v.co.z for v in laub.data.vertices), default=0))
