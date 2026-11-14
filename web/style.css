@@ -1,0 +1,15 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #cfd6d8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; touch-action: none; -webkit-user-select: none; user-select: none; }
+#welt { display: block; width: 100vw; height: 100vh; }
+#lade { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #23332a; color: #eef3ea; }
+#lade .titel { font-size: 34px; font-weight: 700; letter-spacing: .5px; }
+#lade .balken { width: min(420px, 80vw); height: 12px; border-radius: 6px; background: #3d5244; overflow: hidden; }
+#lade-fuellung { height: 100%; width: 0; background: #9bd36a; transition: width .2s; }
+#start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(20, 30, 24, .55); }
+#start[hidden], #lade[hidden] { display: none; }
+#start-knopf { font-size: 24px; padding: 18px 34px; border: 0; border-radius: 14px; background: #9bd36a; color: #15230f; font-weight: 700; }
+.hinweis { color: #fff; font-size: 17px; max-width: 560px; text-align: center; line-height: 1.4; }
+#fadenkreuz { position: fixed; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid rgba(255,255,255,.85); border-radius: 50%; pointer-events: none; }
+#joystick { position: fixed; left: 40px; bottom: 40px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.18); border: 2px solid rgba(255,255,255,.4); pointer-events: none; }
+#joystick-knauf { position: absolute; left: 45px; top: 45px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.75); }
+#fps { position: fixed; right: 10px; top: 10px; padding: 4px 8px; border-radius: 6px; background: rgba(0,0,0,.55); color: #9bd36a; font: 13px ui-monospace, monospace; }
