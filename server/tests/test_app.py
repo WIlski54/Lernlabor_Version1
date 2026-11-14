@@ -66,6 +66,7 @@ def test_assets_unveraenderlich(tmp_path):
     assert r.status_code == 200
     assert r.cache_control.max_age == 31536000
     assert r.cache_control.immutable
+    assert not r.cache_control.no_cache  # no-cache würde max-age/immutable aushebeln
 
 
 def test_service_worker_nicht_zwischengespeichert(tmp_path):

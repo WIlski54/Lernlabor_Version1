@@ -24,14 +24,15 @@ def create_app(dist=None):
         return jsonify(ok=True)
 
     def ausliefern(rel):
-        antwort = send_from_directory(dist, rel)
+        unveraenderlich = rel.startswith("assets/")      # Vite-Dateinamen enthalten einen Hash
+        # max_age an send_file geben – sonst setzt Werkzeug zusätzlich no-cache
+        antwort = send_from_directory(dist, rel, max_age=31536000 if unveraenderlich else None)
         if antwort.status_code == 200 and antwort.mimetype in TEXT_MIMETYPES:
             # Datei-Antworten sind „gestreamt“; Flask-Compress packt Streams nicht mit gzip (Safari!)
             # und prüft dann kein ETag. Textdateien sind klein → als Ganzes in den Speicher.
             antwort.direct_passthrough = False
             antwort.make_sequence()
-        if rel.startswith("assets/"):
-            antwort.cache_control.max_age = 31536000      # Vite-Dateinamen enthalten einen Hash
+        if unveraenderlich:
             antwort.cache_control.immutable = True
         else:
             # welt/, sw.js, HTML: jedes Mal per ETag nachfragen (304, wenn unverändert)
