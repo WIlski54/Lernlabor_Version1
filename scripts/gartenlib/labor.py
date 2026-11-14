@@ -96,10 +96,13 @@ def _whiteboard(haus, m):
                  S, haus, m["board"])
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new("UVMap")
-    ecken = [p - n * 0.016 + a * sa * b / 2 + Vector((0, 0, zc + sz * h / 2)) for sa, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    rechts = n.cross(Vector((0, 0, 1)))                              # von vorn (aus dem Raum) gesehen rechts
+    ecken = [p - n * 0.016 + rechts * sa * b / 2 + Vector((0, 0, zc + sz * h / 2))
+             for sa, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]   # gegen den Uhrzeigersinn → Normale zum Raum
     f = bm.faces.new([bm.verts.new(e) for e in ecken])
     for loop, k in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
         loop[uv].uv = k
+    f.normal_update()                                                # faces.new rechnet keine Normale
     if f.normal.dot(-n) < 0:
         f.normal_flip()
     mesh_aus_bmesh("Whiteboard_Flaeche", bm, S, haus, [m["board"]])

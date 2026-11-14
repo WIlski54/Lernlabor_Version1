@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 const W = '/welt/';
+const WHITEBOARD_FARBE = 0xf4f4f2;
 
 function laderMit(manager) {
   const l = new GLTFLoader(manager);
@@ -98,8 +99,15 @@ export async function ladeWelt(szene, renderer, fortschritt) {
   szene.add(glas.scene);
   const wb = await glb('whiteboard');
   szene.add(wb.scene);
+  // Unbeleuchtet wie die gebackenen Teile; nach dem Tone-Mapping etwas heller als die Wand daneben.
+  // Das Mesh kann auch unter einem gleichnamigen Knoten hängen (mehrere Primitive) → traverse.
+  // DoubleSide als Absicherung, falls die Fläche doch einmal zur Wand zeigt.
   const whiteboard = wb.scene.getObjectByName(konfig.whiteboard);
-  if (whiteboard) whiteboard.material = new THREE.MeshBasicMaterial({ color: 0xf4f4f2 });
+  whiteboard?.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material.dispose();
+    o.material = new THREE.MeshBasicMaterial({ color: WHITEBOARD_FARBE, side: THREE.DoubleSide });
+  });
   const kollision = await glb('kollision');
 
   // 2. Garten

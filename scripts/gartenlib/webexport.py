@@ -5,6 +5,7 @@ import json
 import math
 import os
 import struct
+import time
 
 import bmesh
 import bpy
@@ -217,10 +218,11 @@ def _ersatzmaterial():
     return m
 
 
-def _backen(o, bild, samples):
+def _backen(o, bild, samples, typ="DIFFUSE", durchgaenge=("DIRECT", "INDIRECT", "COLOR")):
     sc = bpy.context.scene
     sc.cycles.samples = samples
     sc.render.bake.margin = 8
+    sc.render.bake.normal_space = "OBJECT"         # Kopien liegen in Weltkoordinaten → Objekt = Welt
     for i, m in enumerate(o.data.materials):
         if m is None:
             o.data.materials[i] = _ersatzmaterial()
@@ -233,9 +235,92 @@ def _backen(o, bild, samples):
         m.node_tree.nodes.active = n
         knoten.append((m, n))
     auswahl_setzen([o])
-    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=8, use_clear=True)
+    bpy.ops.object.bake(type=typ, pass_filter=set(durchgaenge), margin=8, use_clear=True)
     for m, n in knoten:
         m.node_tree.nodes.remove(n)
+
+
+def _pixel(bild):
+    px = np.empty(len(bild.pixels), dtype=np.float32)
+    bild.pixels.foreach_get(px)
+    return px.reshape(-1, 4)
+
+
+def _entrauschen(bild, albedo, normale):
+    """Open Image Denoise über den Compositor, mit Albedo und Normale als Hilfsbildern (die halten Texturen,
+    Kanten und UV-Inselgrenzen scharf). Eigene Szene ohne Render-Layers-Knoten: der Render rechnet nur den
+    Compositor, Cycles startet nicht. Ergebnis als 32-bit-EXR zurück in 'bild'."""
+    b, h = bild.size
+    sc = bpy.data.scenes.new("WEB_Entrauschen")
+    sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = b, h, 100
+    sc.render.use_compositing, sc.render.use_sequencer = True, False
+    sc.render.image_settings.file_format = "OPEN_EXR"
+    sc.render.image_settings.color_depth = "32"
+    sc.render.image_settings.exr_codec = "ZIP"
+    sc.view_settings.view_transform = "Standard"
+    pfad = os.path.join(bpy.app.tempdir, f"{bild.name}_entrauscht.exr")
+    sc.render.filepath = pfad
+    ng = bpy.data.node_groups.new("WEB_Entrauschen", "CompositorNodeTree")
+    sc.compositing_node_group = ng
+    ng.interface.new_socket(name="Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+    dn = ng.nodes.new("CompositorNodeDenoise")
+    dn.inputs["HDR"].default_value = True
+    dn.inputs["Prefilter"].default_value = "Accurate"
+    for eingang, quelle in (("Image", bild), ("Albedo", albedo), ("Normal", normale)):
+        k = ng.nodes.new("CompositorNodeImage")
+        k.image = quelle
+        ng.links.new(k.outputs["Image"], dn.inputs[eingang])
+    ng.links.new(dn.outputs["Image"], ng.nodes.new("NodeGroupOutput").inputs["Image"])
+    bpy.ops.render.render(write_still=True, scene=sc.name)
+    erg = bpy.data.images.load(pfad)
+    if tuple(erg.size) != (b, h):
+        raise RuntimeError(f"Entrauschen: Größe {tuple(erg.size)} statt {(b, h)}")
+    px = _pixel(erg)
+    px[:, :3] = np.maximum(px[:, :3], 0.0)
+    bild.pixels.foreach_set(px.ravel())
+    bpy.data.images.remove(erg)
+    bpy.data.scenes.remove(sc)
+    bpy.data.node_groups.remove(ng)
+    os.remove(pfad)
+
+
+def _metall_aus(o):
+    """Ein Diffus-Bake von Metall ist schwarz (Metall hat keinen diffusen Anteil) – Alu-Rahmen, Beschläge
+    erschienen im Web schwarz. Für die Lightmap gilt Metall daher als matte Fläche in seiner Grundfarbe.
+    Rückgabe: [(Material, Eingang, alter Wert)] zum Zurücksetzen."""
+    alt = []
+    for m in {m for m in o.data.materials if m and m.use_nodes}:
+        for n in m.node_tree.nodes:
+            if n.type == "BSDF_PRINCIPLED":
+                e = n.inputs["Metallic"]
+                if not e.is_linked and e.default_value > 0.0:
+                    alt.append((m.name, e, e.default_value))
+                    e.default_value = 0.0
+    return alt
+
+
+def _backen_entrauscht(o, name, aufl, samples):
+    """Licht backen und entrauschen; Hilfsbilder (Albedo, Normale) brauchen nur wenige Samples."""
+    metall = _metall_aus(o)
+    print("METALL MATT", name, sorted({m for m, _e, _w in metall}), flush=True)
+    try:
+        bild = bpy.data.images.new(f"Licht_{name}", aufl, aufl, alpha=False, float_buffer=True)
+        _backen(o, bild, samples)
+        albedo = bpy.data.images.new(f"Albedo_{name}", aufl, aufl, alpha=False, float_buffer=True)
+        _backen(o, albedo, 16, durchgaenge=("COLOR",))
+    finally:
+        for _m, e, wert in metall:
+            e.default_value = wert
+    normale = bpy.data.images.new(f"Normale_{name}", aufl, aufl, alpha=False, float_buffer=True)
+    _backen(o, normale, 16, typ="NORMAL", durchgaenge=())
+    normale.colorspace_settings.name = "Non-Color"
+    px = _pixel(normale)
+    px[:, :3] = px[:, :3] * 2.0 - 1.0                # Bake speichert n·0,5+0,5; OIDN erwartet −1…1
+    normale.pixels.foreach_set(px.ravel())
+    _entrauschen(bild, albedo, normale)
+    for b in (albedo, normale):
+        bpy.data.images.remove(b)
+    return bild
 
 
 def _bild_speichern(bild, pfad, faktor=0.5):
@@ -269,8 +354,7 @@ def bake_gruppe(name, ziel, samples=192):
         o.hide_render = True
     o = vereinen(f"Licht_{name}", kopien)
     _lightmap_uv(o, aufl)
-    bild = bpy.data.images.new(f"Licht_{name}", aufl, aufl, alpha=False, float_buffer=True)
-    _backen(o, bild, samples)
+    bild = _backen_entrauscht(o, name, aufl, samples)
     pfad = os.path.join(ziel, f"licht_{name}.png")
     _bild_speichern(bild, pfad)
     me = o.data
@@ -296,21 +380,74 @@ def glas_export(ziel):
     return {"objekte": len(objs)}
 
 
+def _zum_raum_ausrichten(o, innen):
+    """Fläche so drehen, dass ihre Vorderseite (Wicklung) in Richtung 'innen' zeigt, und U so spiegeln,
+    dass u von vorn gesehen nach rechts wächst (sonst stünde ein darauf gemaltes Bild seitenverkehrt)."""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bm.faces.ensure_lookup_table()
+    bm.normal_update()
+    erg = {"gedreht": False, "gespiegelt": False}
+    if bm.faces[0].normal.dot(innen) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+        bm.faces.ensure_lookup_table()
+        bm.normal_update()
+        erg["gedreht"] = True
+    f = bm.faces[0]
+    uv = bm.loops.layers.uv.active
+    rechts = (-f.normal).cross(Vector((0, 0, 1)))
+    lo = min(f.loops, key=lambda l: l[uv].uv.x)
+    hi = max(f.loops, key=lambda l: l[uv].uv.x)
+    if (hi.vert.co - lo.vert.co).dot(rechts) < 0:
+        for g in bm.faces:
+            for l in g.loops:
+                l[uv].uv.x = 1.0 - l[uv].uv.x
+        erg["gespiegelt"] = True
+    bm.to_mesh(o.data)
+    bm.free()
+    return erg
+
+
+def _mitte_welt(o):
+    return o.matrix_world @ (sum((Vector(c) for c in o.bound_box), Vector()) / 8)
+
+
 def whiteboard_export(ziel):
     dg = bpy.context.evaluated_depsgraph_get()
     orig = bpy.data.objects["Whiteboard_Flaeche"]
     k = kopie(orig, dg)
+    # Die Fläche liegt vor dem Träger (an der Wand): Träger → Fläche zeigt in den Raum
+    innen = _mitte_welt(orig) - _mitte_welt(bpy.data.objects["Labor_Whiteboard_Traeger"])
+    ausrichtung = _zum_raum_ausrichten(k, innen)
     orig.name = "Whiteboard_Flaeche_Original"     # sonst hieße die Kopie „Whiteboard_Flaeche.001“
     k.name = "Whiteboard_Flaeche"
     exportieren([k], os.path.join(ziel, "whiteboard.glb"))
     k.name = "WEB_Whiteboard_Flaeche"
     orig.name = "Whiteboard_Flaeche"
-    return {"ok": True, "name": "Whiteboard_Flaeche"}
+    return {"ok": True, "name": "Whiteboard_Flaeche", **ausrichtung}
+
+
+# Nicht gebacken, aber render-sichtbar: beim Backen verbergen, sonst verschatten sie, was hinter ihnen liegt
+# (die Whiteboard-Fläche schwebt 1 mm vor dem Träger – der Träger bekäme sonst eine schwarze Lightmap).
+BEIM_BACKEN_VERBERGEN = ("Whiteboard_Flaeche",)
 
 
 @teil("bake")
 def _bake(ziel):
-    erg = {name: bake_gruppe(name, ziel) for name in GRUPPEN}
+    verborgen = [o for o in bpy.data.objects if o.name in BEIM_BACKEN_VERBERGEN and not o.hide_render]
+    erg, zeiten = {}, {}
+    try:
+        for o in verborgen:
+            o.hide_render = True
+        for name in GRUPPEN:
+            t = time.time()
+            erg[name] = bake_gruppe(name, ziel)
+            zeiten[name] = round(time.time() - t, 1)
+            print("GRUPPE FERTIG", name, zeiten[name], "s", flush=True)
+    finally:
+        for o in verborgen:
+            o.hide_render = False
+    erg["zeiten_s"] = zeiten
     erg["glas"] = glas_export(ziel)
     erg["whiteboard"] = whiteboard_export(ziel)
     return erg
