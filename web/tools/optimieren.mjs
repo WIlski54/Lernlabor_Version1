@@ -14,7 +14,8 @@ const ORDNER = path.resolve('public/welt');
 const SERVICE_WORKER = path.resolve('public/sw.js');
 const BUDGET = { megabyte: 80, dreiecke: 1_500_000 };
 const GRAS_DREIECKE = 120_000; // dynamisches Gras in der Web-App (Task 9)
-const MAX_TEXTUR = { haus: 4096 };
+// iPad-Grafikspeicher: nur das Haus braucht 4K; die Boden-Lightmap ist großflächig und weich → 512 reicht.
+const MAX_TEXTUR = { haus: 4096, boden: 512 };
 
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
