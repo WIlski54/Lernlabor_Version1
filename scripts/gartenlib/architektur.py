@@ -12,16 +12,52 @@ S = "02_Architektur"
 
 
 def glas_material():
-    m = bpy.data.materials.get("M_Glas")
-    if m is None:
-        m = bpy.data.materials.new("M_Glas")
-        b = m.node_tree.nodes["Principled BSDF"]
-        b.inputs["Base Color"].default_value = (0.9, 0.95, 0.95, 1.0)
-        b.inputs["Transmission Weight"].default_value = 1.0
-        b.inputs["Roughness"].default_value = 0.02
-        b.inputs["IOR"].default_value = 1.5
-        if hasattr(m, "use_raytrace_refraction"):
-            m.use_raytrace_refraction = True
+    """Floatglas: leicht grünlicher Eigenton, IOR 1,52, hauchfeine Schlieren in der Rauheit."""
+    m = bpy.data.materials.get("M_Glas") or bpy.data.materials.new("M_Glas")
+    nt = m.node_tree
+    nt.nodes.clear()
+    aus = nt.nodes.new("ShaderNodeOutputMaterial")
+    b = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    b.inputs["Base Color"].default_value = (0.9, 0.96, 0.94, 1.0)
+    b.inputs["Transmission Weight"].default_value = 1.0
+    b.inputs["IOR"].default_value = 1.52
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    rausch = nt.nodes.new("ShaderNodeTexNoise")
+    rausch.inputs["Scale"].default_value = 3.0
+    rausch.inputs["Detail"].default_value = 4.0
+    nt.links.new(tc.outputs["Object"], rausch.inputs["Vector"])
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["From Min"].default_value = 0.5
+    mr.inputs["From Max"].default_value = 0.75
+    mr.inputs["To Min"].default_value = 0.0
+    mr.inputs["To Max"].default_value = 0.035
+    nt.links.new(rausch.outputs["Fac"], mr.inputs["Value"])
+    nt.links.new(mr.outputs["Result"], b.inputs["Roughness"])
+    nt.links.new(b.outputs[0], aus.inputs["Surface"])
+    for attr, wert in (("use_raytrace_refraction", True), ("thickness_mode", "SLAB")):
+        if hasattr(m, attr):
+            try:
+                setattr(m, attr, wert)
+            except Exception:
+                pass
+    return m
+
+
+def _metall(name, farbe, rauheit, metall, relief=0.04):
+    """Pulverbeschichtung/Aluminium mit feinem Oberflächenrelief."""
+    m = material(name, farbe, rauheit, metall)
+    nt = m.node_tree
+    b = nt.nodes.get("Principled BSDF")
+    b.inputs["Base Color"].default_value = (*farbe, 1.0)
+    b.inputs["Roughness"].default_value = rauheit
+    b.inputs["Metallic"].default_value = metall
+    if relief and not b.inputs["Normal"].is_linked:
+        tx = nt.nodes.new("ShaderNodeTexNoise")
+        tx.inputs["Scale"].default_value = 300.0
+        bp = nt.nodes.new("ShaderNodeBump")
+        bp.inputs["Strength"].default_value = relief
+        nt.links.new(tx.outputs["Fac"], bp.inputs["Height"])
+        nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
     return m
 
 
@@ -32,7 +68,9 @@ def mats():
         "blech": material("M_Dachblech", (0.06, 0.06, 0.065), 0.45, 0.6),
         "traufe": material("M_Traufe", (0.08, 0.06, 0.05), 0.7),
         "ziegel": material("M_Dachziegel", (0.12, 0.12, 0.13), 0.6),
-        "rahmen": material("M_Rahmen", (0.03, 0.03, 0.035), 0.4),
+        "rahmen": _metall("M_Rahmen", (0.04, 0.043, 0.047), 0.38, 0.35),          # anthrazit, pulverbeschichtet
+        "beschlag": _metall("M_Beschlag", (0.62, 0.62, 0.63), 0.3, 1.0, 0.02),    # gebürstetes Aluminium
+        "dichtung": material("M_Dichtung", (0.012, 0.012, 0.012), 0.65),
         "stahl": material("M_Stahl_Schwarz", (0.02, 0.02, 0.02), 0.5),
         "tuer": material("M_Haustuer", (0.12, 0.07, 0.04), 0.5),
         "glas": glas_material(),
@@ -202,27 +240,68 @@ def _oeffnung(name, wurzel, schneider, seite, versatz, z_unten, b, h, art, breit
     _als_schneider(s)
     a = Vector((-n.y, n.x, 0))          # Richtung entlang der Wand
     mitte = p - n * 0.10                # Rahmenebene 10 cm hinter der Außenfläche
-    rb, rt = 0.06, 0.07
-    teile = [
-        (_quer(n, b, rt, rb), mitte + Vector((0, 0, zc + h / 2 - rb / 2))),
-        (_quer(n, rb, rt, h), mitte + a * (b / 2 - rb / 2) + Vector((0, 0, zc))),
-        (_quer(n, rb, rt, h), mitte - a * (b / 2 - rb / 2) + Vector((0, 0, zc))),
-    ]
-    if art == "fenster":
-        teile.append((_quer(n, b, rt, rb), mitte + Vector((0, 0, zc - h / 2 + rb / 2))))
-    if art == "tuer_offen":
-        teile.append((_quer(n, rb, rt, h), mitte + Vector((0, 0, zc))))
-    fase(boxen_objekt(f"Rahmen_{name}", teile, S, wurzel, m["rahmen"]), 0.004)
-    if art == "fenster":
-        boxen_objekt(f"Glas_{name}", [(_quer(n, b - 2 * rb, 0.02, h - 2 * rb), mitte + Vector((0, 0, zc)))],
-                     S, wurzel, m["glas"])
-    elif art == "tuer_offen":
-        halb = (b - 3 * rb) / 2
-        boxen_objekt(f"Glas_{name}", [(_quer(n, halb, 0.02, h - rb), mitte + a * (b / 4) + Vector((0, 0, zc - rb / 2)))],
-                     S, wurzel, m["glas"])
-    elif art == "tuer":
-        boxen_objekt(f"Tuerblatt_{name}", [(_quer(n, b - 2 * rb, 0.05, h - rb), mitte + Vector((0, 0, zc - rb / 2)))],
-                     S, wurzel, m["tuer"])
+
+    def teil(liste, s, z, d, sb, sd, sz):
+        """Quader in Fensterkoordinaten: s entlang der Wand, z absolut, d entlang der Außennormalen."""
+        liste.append((_quer(n, sb, sd, sz), mitte + a * s + n * d + Vector((0, 0, z))))
+
+    rahmen, glas, details, dichtung = [], [], [], []
+    rb, rt = 0.07, 0.08                 # Blendrahmen: Ansichtsbreite, Bautiefe
+    ist_tuer = art in ("tuer", "tuer_offen")
+    unten = 0.02 if ist_tuer else rb    # Türen: flache Schwelle statt unterem Rahmen
+    # Blendrahmen
+    teil(rahmen, 0, zc + h / 2 - rb / 2, 0, b, rt, rb)
+    teil(rahmen, 0, z_unten + unten / 2, 0, b, rt + (0.04 if ist_tuer else 0), unten)
+    for sx in (-1, 1):
+        teil(rahmen, sx * (b / 2 - rb / 2), zc, 0, rb, rt, h)
+    wi, zi0, zi1 = b - 2 * rb, z_unten + unten, z_unten + h - rb
+    if art == "tuer":
+        blatt =[(_quer(n, wi - 0.004, 0.06, zi1 - zi0), mitte - n * 0.005 + Vector((0, 0, (zi0 + zi1) / 2)))]
+        fase(boxen_objekt(f"Tuerblatt_{name}", blatt, S, wurzel, m["tuer"]), 0.004)
+        for d in (0.06, -0.06):                                                         # Stoßgriff außen und innen
+            teil(details, -wi / 2 + 0.15, zi0 + 1.05, d, 0.025, 0.025, 0.9)
+            teil(details, -wi / 2 + 0.15, zi0 + 0.65, d * 0.6, 0.02, abs(d) * 0.8, 0.02)
+            teil(details, -wi / 2 + 0.15, zi0 + 1.45, d * 0.6, 0.02, abs(d) * 0.8, 0.02)
+    else:
+        felder = 2 if (wi > 1.4 or art == "tuer_offen") else 1
+        pf = 0.08                                                                      # Mittelpfosten
+        if felder == 2:
+            teil(rahmen, 0, (zi0 + zi1) / 2, 0, pf, rt, zi1 - zi0)
+        fw = (wi - (pf if felder == 2 else 0)) / felder
+        for k in range(felder):
+            s0 = -wi / 2 + k * (fw + pf) + fw / 2
+            if art == "tuer_offen" and k == 0:
+                continue                                                               # offene Hälfte (Durchgang)
+            rs, fh, fz = 0.065, zi1 - zi0, (zi0 + zi1) / 2
+            # Flügelrahmen, leicht nach innen versetzt
+            teil(rahmen, s0, zi1 - rs / 2, -0.01, fw, 0.07, rs)
+            teil(rahmen, s0, zi0 + rs / 2, -0.01, fw, 0.07, rs)
+            for sx in (-1, 1):
+                teil(rahmen, s0 + sx * (fw / 2 - rs / 2), fz, -0.01, rs, 0.07, fh)
+            gw, gh = fw - 2 * rs, fh - 2 * rs
+            # Zweifachverglasung: zwei 4-mm-Scheiben mit 16 mm Zwischenraum
+            for d in (0.008, -0.028):
+                teil(glas, s0, fz, d, gw + 0.02, 0.004, gh + 0.02)
+            # Abstandhalter (umlaufend im Scheibenzwischenraum, sichtbar am Glasrand)
+            for zz, hh, ss, bb in ((fz + gh / 2 - 0.006, 0.012, s0, gw), (fz - gh / 2 + 0.006, 0.012, s0, gw),
+                                   (fz, gh, s0 - gw / 2 + 0.006, 0.012), (fz, gh, s0 + gw / 2 - 0.006, 0.012)):
+                teil(details, ss, zz, -0.01, bb, 0.014, hh)
+            # schwarze Dichtungen außen und innen am Glasrand
+            for d in (0.026, -0.046):
+                for zz, hh, ss, bb in ((fz + gh / 2 - 0.003, 0.006, s0, gw), (fz - gh / 2 + 0.003, 0.006, s0, gw),
+                                       (fz, gh, s0 - gw / 2 + 0.003, 0.006), (fz, gh, s0 + gw / 2 - 0.003, 0.006)):
+                    teil(dichtung, ss, zz, d, bb, 0.006, hh)
+            # Fenstergriff innen (Rosette + Hebel) an der Pfostenseite bzw. rechts
+            gs = s0 + (fw / 2 - rs / 2) * (1 if k == 0 else -1)
+            teil(details, gs, fz, -0.055, 0.03, 0.012, 0.075)
+            teil(details, gs, fz - 0.05, -0.075, 0.02, 0.018, 0.12)
+    fase(boxen_objekt(f"Rahmen_{name}", rahmen, S, wurzel, m["rahmen"]), 0.003)
+    if glas:
+        boxen_objekt(f"Glas_{name}", glas, S, wurzel, m["glas"])
+    if details:
+        fase(boxen_objekt(f"Beschlag_{name}", details, S, wurzel, m["beschlag"]), 0.002, 1)
+    if dichtung:
+        boxen_objekt(f"Dichtung_{name}", dichtung, S, wurzel, m["dichtung"])
 
 
 def _oeffnungen(praefix, liste, z_boden, wurzel, schneider, breite, tiefe, wand, m):

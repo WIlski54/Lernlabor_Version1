@@ -20,7 +20,8 @@ TEXTUR_MATS = {
     "M_Weg_Platten": dict(rolle="tex_weg", skala=2.0, tint=(0.45, 0.45, 0.47), rauheit_min=0.6),
     "M_Polygonalplatten": dict(rolle="tex_steinplatten", skala=2.5, tint=(0.13, 0.13, 0.14), rauheit_min=0.8, bump=1.0),
     "M_Beet": dict(rolle="tex_beet", skala=1.5, tint=(0.45, 0.4, 0.35)),
-    "M_Erde": dict(rolle="tex_beet", skala=1.5, tint=(0.25, 0.32, 0.15)),
+    # Boden unter dem Rasen grasgrün getönt: beim Laufen (leichte Rasenstücke) fallen Lücken so nicht auf
+    "M_Erde": dict(rolle="tex_beet", skala=1.5, tint=(0.2, 0.42, 0.08)),
     "M_Rinde_Ahorn": dict(rolle="tex_rinde_ahorn", skala=0.8),
     "M_Parkett": dict(rolle="tex_parkett", skala=2.0),
     "M_Teppich": dict(rolle="tex_teppich", skala=0.6, rauheit_min=0.85),

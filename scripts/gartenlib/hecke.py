@@ -127,7 +127,9 @@ def blattmaterial():
     nt.nodes.clear()
     aus = nt.nodes.new("ShaderNodeOutputMaterial")
     bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.inputs["Roughness"].default_value = 0.42
+    bsdf.inputs["Roughness"].default_value = 0.55
+    if "Specular IOR Level" in bsdf.inputs:  # weniger Himmelsspiegelung – sonst wirken ferne Blätter weißlich
+        bsdf.inputs["Specular IOR Level"].default_value = 0.3
     tr = nt.nodes.new("ShaderNodeBsdfTranslucent")
     geo = nt.nodes.new("ShaderNodeNewGeometry")
     oi = nt.nodes.new("ShaderNodeObjectInfo")
@@ -159,20 +161,48 @@ def blattmaterial():
 
 
 def kernmaterial():
-    """Dunkles Heckeninneres; unten bräunlich (Äste, Laubstreu)."""
+    """Heckeninneres als dichtes Laubbild: Voronoi-Zellen = einzelne Blätter (je eigener Grünton,
+    dunkle Zwischenräume als Tiefe, gewölbtes Relief). Unten bräunlich (Äste, Laubstreu).
+    Wichtig für den Modus Laufen, in dem nur wenige echte Blattballen gestreut werden."""
     from .materialien import mathe, mix_farbe
+    from .pflanzen import _farbrampe
     m = bpy.data.materials.get("M_Hecke_Kern") or bpy.data.materials.new("M_Hecke_Kern")
     nt = m.node_tree
     nt.nodes.clear()
     aus = nt.nodes.new("ShaderNodeOutputMaterial")
     bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.inputs["Roughness"].default_value = 0.9
+    bsdf.inputs["Roughness"].default_value = 0.55
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    vor = nt.nodes.new("ShaderNodeTexVoronoi")
+    vor.inputs["Scale"].default_value = 22.0
+    vor.inputs["Randomness"].default_value = 1.0
+    nt.links.new(tc.outputs["Object"], vor.inputs["Vector"])
+    kante = nt.nodes.new("ShaderNodeTexVoronoi")
+    kante.feature = "DISTANCE_TO_EDGE"
+    kante.inputs["Scale"].default_value = 22.0
+    kante.inputs["Randomness"].default_value = 1.0
+    nt.links.new(tc.outputs["Object"], kante.inputs["Vector"])
+    zelle = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(vor.outputs["Color"], zelle.inputs[0])
+    blatt = _farbrampe(nt, zelle.outputs[0], [(0.0, (0.012, 0.035, 0.008)), (0.5, (0.03, 0.07, 0.016)),
+                                              (0.85, (0.06, 0.11, 0.025)), (1.0, (0.1, 0.14, 0.04))])
+    # Zwischenräume (nahe der Zellkante) dunkel → wirkt wie Tiefe zwischen den Blättern
+    luecke = mathe(nt, "LESS_THAN", kante.outputs["Distance"], 0.06)
+    farbe = mix_farbe(nt, blatt, (0.004, 0.01, 0.003), mathe(nt, "MULTIPLY", luecke, 0.85))
+    gross = nt.nodes.new("ShaderNodeTexNoise")
+    gross.inputs["Scale"].default_value = 1.2
+    nt.links.new(tc.outputs["Object"], gross.inputs["Vector"])
+    farbe = mix_farbe(nt, farbe, (0.45, 0.45, 0.45), mathe(nt, "MULTIPLY", gross.outputs["Fac"], 0.6), "MULTIPLY")
     geo = nt.nodes.new("ShaderNodeNewGeometry")
     sep = nt.nodes.new("ShaderNodeSeparateXYZ")
     nt.links.new(geo.outputs["Position"], sep.inputs[0])
-    unten = mathe(nt, "LESS_THAN", sep.outputs["Z"], 0.45)
-    farbe = mix_farbe(nt, (0.008, 0.02, 0.006), (0.03, 0.02, 0.012), unten)
+    unten = mathe(nt, "LESS_THAN", sep.outputs["Z"], 0.3)
+    farbe = mix_farbe(nt, farbe, (0.03, 0.02, 0.012), mathe(nt, "MULTIPLY", unten, 0.8))
     nt.links.new(farbe, bsdf.inputs["Base Color"])
+    bp = nt.nodes.new("ShaderNodeBump")
+    bp.inputs["Strength"].default_value = 0.7
+    nt.links.new(kante.outputs["Distance"], bp.inputs["Height"])
+    nt.links.new(bp.outputs["Normal"], bsdf.inputs["Normal"])
     nt.links.new(bsdf.outputs[0], aus.inputs["Surface"])
     return m
 
@@ -305,9 +335,9 @@ def ballen_bibliothek():
     for k in range(4):
         bm = bmesh.new()
         uv = bm.loops.layers.uv.new("UVMap")
-        for i in range(70):
+        for i in range(95):
             w = i * 2.39996
-            r = 0.22 * math.sqrt(rnd.random())
+            r = 0.28 * math.sqrt(rnd.random())
             basis = Vector((math.cos(w) * r, math.sin(w) * r, rnd.uniform(-0.08, 0.05)))
             richtung = Vector((math.cos(w), math.sin(w), rnd.uniform(-0.2, 0.3))).normalized()
             normale = Vector((rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), 1.0)).normalized()
@@ -330,6 +360,8 @@ def baue():
         laenge = (b - a).length + 0.6  # Enden überlappen an den Ecken
         kern = mesh_aus_bmesh(f"Hecke_{i + 1}_Kern", kern_mesh(laenge, tiefe, hoehe, i), "01c_Heckenkern",
                               mats=[kern_m])
+        for poly in kern.data.polygons:  # weich schattieren – keine sichtbaren Rechteckflächen
+            poly.use_smooth = True
         kern.location = ((a.x + b.x) / 2, (a.y + b.y) / 2, 0.0)
         kern.rotation_euler = (0.0, 0.0, math.atan2(b.y - a.y, b.x - a.x))
         laub = bpy.data.objects.new(f"Hecke_{i + 1}_Laub", kern.data)
@@ -341,6 +373,6 @@ def baue():
         gn_setze(mod, "Bibliothek_Lauf", bpy.data.collections["Bib_Heckenblatt_Lauf"])
         gn_setze(mod, "Seed", 60 + i)
         gn_setze(mod, "Tiefe", 0.06)
-        treiber_modus(laub, f'modifiers["Hecke"]["{gn_kennung(ng, "Dichte")}"]', "6.0 + (600.0 - 6.0) * m")
+        treiber_modus(laub, f'modifiers["Hecke"]["{gn_kennung(ng, "Dichte")}"]', "12.0 + (600.0 - 12.0) * m")
         treiber_modus(laub, f'modifiers["Hecke"]["{gn_kennung(ng, "Lauf_Bibliothek")}"]', "1.0 - m")
     return {"hecken": len(L.HECKEN)}

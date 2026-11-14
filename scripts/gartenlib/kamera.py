@@ -31,5 +31,9 @@ def baue():
     _kamera("Kamera_Uebersicht", UEBERSICHT["ort"], UEBERSICHT["ziel"], UEBERSICHT["brennweite"])
     _kamera("Kamera_Haus", HAUS_NAH["ort"], HAUS_NAH["ziel"], HAUS_NAH["brennweite"])
     _kamera("Kamera_Hecke", HECKE_NAH["ort"], HECKE_NAH["ziel"], HECKE_NAH["brennweite"])
+    haus = bpy.data.objects.get("Haus")
+    if haus is not None:  # Nahaufnahme Südfassade: Fenster EG und Terrassentür (Haus-lokale Koordinaten)
+        mw = haus.matrix_world
+        _kamera("Kamera_Fenster", mw @ Vector((0.6, -9.2, 1.55)), mw @ Vector((-0.4, -4.5, 1.55)), 32.0)
     bpy.context.scene.camera = o
     return {"rotation": list(o.rotation_euler)}

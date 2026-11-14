@@ -144,6 +144,22 @@ def _kueche(haus):
     fase(becken, 0.002, 1)
 
 
+def _fensterbaenke_innen(haus):
+    """Helle Steinfensterbänke innen: vom Fensterrahmen bis 4 cm in den Raum."""
+    from .architektur import _quer, _wandpunkt
+    H = L.HAUS
+    stein = material("M_Fensterbank_Innen", (0.78, 0.77, 0.74), 0.3)
+    teile = []
+    for seite, versatz, bruestung, b, h, art in L.HAUS_EG_OEFFNUNGEN:
+        if art != "fenster" or bruestung < 0.3:
+            continue
+        p, n = _wandpunkt(seite, versatz, H["breite"], H["tiefe"])
+        tief = H["wand"] - 0.14 + 0.04
+        mitte = p - n * (0.14 + tief / 2)
+        teile.append((_quer(n, b + 0.06, tief, 0.03), mitte + Vector((0, 0, H["boden"] + bruestung - 0.015))))
+    fase(boxen_objekt("Innen_Fensterbaenke", teile, S, haus, stein), 0.003, 2)
+
+
 def _sockelleisten(haus):
     from .architektur import _quer, _wandpunkt
     from .fassade import _frei
@@ -263,6 +279,7 @@ def baue():
                  material("M_Decke", (0.82, 0.81, 0.78), 0.9))
     _kueche(haus)
     _sockelleisten(haus)
+    _fensterbaenke_innen(haus)
     cache, oberkanten = {}, {}
     for rolle, name, ort, drehung, hoehe in I["moebel"]:
         _moebel(rolle, name, ort, drehung, hoehe, haus, cache, log, oberkanten)
