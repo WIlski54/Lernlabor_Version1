@@ -24,6 +24,11 @@ TEXTUR_MATS = {
     "M_Rinde_Ahorn": dict(rolle="tex_rinde_ahorn", skala=0.8),
     "M_Parkett": dict(rolle="tex_parkett", skala=2.0),
     "M_Teppich": dict(rolle="tex_teppich", skala=0.6, rauheit_min=0.85),
+    "M_Teppich_Hochflor": dict(rolle="tex_teppich_hochflor", skala=0.35, bump=1.0, rauheit_min=0.9),
+    "M_Teppich_Boucle": dict(rolle="tex_teppich_boucle", skala=0.45, bump=0.8, rauheit_min=0.9),
+    # dunkles Jacquard-Muster aufhellen (Helligkeit × 2,2 + 0,55), dann salbeigrün tönen
+    "M_Tapete": dict(rolle="tex_tapete", skala=0.55, grau=(2.2, 0.55), tint=(0.66, 0.72, 0.6), bump=0.25, rauheit_min=0.75),
+    "M_Eiche": dict(rolle="tex_parkett", skala=1.5, vertikal=True, insel_variation=0.12),
     "M_Vorhang": dict(rolle="tex_vorhang", skala=0.8, grau=True, tint=(0.95, 0.91, 0.84), rauheit_min=0.85),
     "M_Arbeitsplatte": dict(rolle="tex_arbeitsplatte", skala=3.0, rauheit_min=0.25),
 }
@@ -199,9 +204,10 @@ def pbr(name, rolle, skala=1.0, tint=None, vertikal=False, verschiebung=0.0, bum
 
     farbe = _bild(nt, diff, True, vek).outputs["Color"]
     if grau:  # Farbe der Textur verwerfen, nur Helligkeitsstruktur behalten (z. B. blaues Leinen → cremeweiß)
+        faktor, versatz = grau if isinstance(grau, tuple) else (1.6, 0.0)
         bw = nt.nodes.new("ShaderNodeRGBToBW")
         nt.links.new(farbe, bw.inputs[0])
-        hell = mathe(nt, "MULTIPLY", bw.outputs[0], 1.6)
+        hell = mathe(nt, "MULTIPLY_ADD", bw.outputs[0], faktor, versatz)
         kom = nt.nodes.new("ShaderNodeCombineColor")
         for i in range(3):
             nt.links.new(hell, kom.inputs[i])
@@ -250,6 +256,40 @@ def pbr(name, rolle, skala=1.0, tint=None, vertikal=False, verschiebung=0.0, bum
             nt.links.new(d.outputs[0], aus.inputs["Displacement"])
             m.displacement_method = "BOTH"
     return m
+
+
+def modelltexturen_verkleinern(max_px=1024):
+    """Texturen der Poly-Haven-Modelle (Möbel, Deko, Sträucher) als verkleinerte Kopien unter
+    assets/polyhaven/models_1k/ speichern und die Bilder darauf umstellen – spart GPU-Speicher in Cycles.
+    Die Originale bleiben unverändert; bereits verkleinerte Kopien werden wiederverwendet."""
+    import os
+    quelle = os.path.normcase(pfad("assets", "polyhaven", "models"))
+    ziel_basis = pfad("assets", "polyhaven", f"models_{max_px // 1024}k")
+    umgestellt, gespart = 0, 0.0
+    for im in bpy.data.images:
+        if im.source != "FILE" or not im.filepath:
+            continue
+        abs_pfad = os.path.normcase(os.path.abspath(bpy.path.abspath(im.filepath)))
+        if not abs_pfad.startswith(quelle) or max(im.size) <= max_px:
+            continue
+        rel = os.path.relpath(abs_pfad, quelle)
+        neu = os.path.join(ziel_basis, rel)
+        w, h = im.size
+        k = max_px / max(w, h)
+        bpp = 16 if im.is_float else 4
+        if not os.path.exists(neu):
+            os.makedirs(os.path.dirname(neu), exist_ok=True)
+            kopie = im.copy()
+            kopie.scale(max(1, int(w * k)), max(1, int(h * k)))
+            kopie.filepath_raw = neu
+            kopie.file_format = im.file_format
+            kopie.save()
+            bpy.data.images.remove(kopie)
+        im.filepath = neu
+        im.reload()
+        umgestellt += 1
+        gespart += w * h * bpp * (1 - k * k) / 1e6
+    return {"umgestellt": umgestellt, "gespart_mb": round(gespart)}
 
 
 def baue():

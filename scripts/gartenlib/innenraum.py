@@ -158,6 +158,7 @@ def _sockelleisten(haus):
         gesperrt = [(v - br / 2, v + br / 2) for s, v, bru, br, h, _ in L.HAUS_EG_OEFFNUNGEN if s == seite and bru < 0.3]
         if seite == "N":
             gesperrt.append(kueche_n)
+        gesperrt += [(a, e) for s, a, e in I["vertaefelung"] if s == seite]  # Vertäfelung hat eigenen Sockel
         for a, e in _frei((-laenge / 2, laenge / 2), gesperrt):
             p, n = _wandpunkt(seite, (a + e) / 2, b, t)
             bm_box(bm, _quer(n, e - a, 0.012, 0.07), p - n * 0.006 + Vector((0, 0, I["boden_z"] + 0.055)))
@@ -265,12 +266,15 @@ def baue():
     cache, oberkanten = {}, {}
     for rolle, name, ort, drehung, hoehe in I["moebel"]:
         _moebel(rolle, name, ort, drehung, hoehe, haus, cache, log, oberkanten)
-    _teppich(haus)
+    from . import wohnen
+    wohnen.baue(haus)
     _vorhaenge(haus)
     _lichter(haus)
     _lichtsonden(haus, log)
     _kamera(haus)
     _kamera(haus, "Kamera_Innen_2", "kamera_2")
+    from .materialien import modelltexturen_verkleinern
+    log.append(f"Texturen: {modelltexturen_verkleinern()}")  # neu angehängte Modelle wieder auf 1K
     return {"log": log, "objekte": len(bpy.data.collections[S].all_objects)}
 
 

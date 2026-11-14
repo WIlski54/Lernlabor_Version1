@@ -142,9 +142,26 @@ INNEN = {
         ("modelle_zimmerpflanze", "Pflanze_1", (5.1, -3.6), 0.0, False),
         ("modelle_zimmerpflanze_2", "Pflanze_2", (-5.2, 3.6), 0.0, False),
         ("modelle_kissen", "Kissen", (-2.8, -0.5), 0.0, 0.42),
+        ("modelle_bild_2", "Bild_Ess", (-4.4, 4.17), 0.0, 1.45),
+        ("modelle_bild", "Bild_Wohnen", (-3.07, -4.17), 180.0, 1.4),
+        ("modelle_buecher", "Buecher_Wand", (5.58, 1.45), -90.0, 1.25),
+        ("modelle_vase_2", "Vase_Wand", (5.58, 2.2), 0.0, 1.25),
+        ("modelle_bild_stehend", "Bild_Wand", (5.6, 2.05), -90.0, 1.70),
+        ("modelle_schale", "Schale_Wand", (5.58, 1.5), 0.0, 1.70),
         ("modelle_schale", "Schale", (-2.2, 2.4), 0.0, "auf:Esstisch"),
     ],
-    "teppich": ((-2.8, -1.7), (2.6, 1.8)),
+    # (name, (x, y), (breite, tiefe), material, mit_flor)
+    "teppiche": [("Wohnen", (-2.8, -1.7), (2.6, 1.8), "M_Teppich_Hochflor", True),
+                 ("Essen", (-2.2, 2.4), (2.6, 2.2), "M_Teppich_Boucle", False),
+                 ("Kueche", (2.3, 2.85), (2.6, 0.75), "M_Teppich", False)],
+    "laeufer_fransen": ((2.3, 2.85), (2.6, 0.75)),
+    "fussmatten": [((-4.2, -3.78), (0.9, 0.55)), ((1.95, -3.78), (0.9, 0.55))],
+    # Holzlamellen-Raumteiler hinter dem Sofa (x-Bereich, y-Lage)
+    "lamellenwand": {"x": (-4.3, -1.3), "y": 0.2},
+    # Vertäfelung + Tapete: (seite, versatz_von, versatz_bis) an der Innenwand – W: y = -versatz, N: x = -versatz
+    "vertaefelung": [("W", -4.2, -0.1), ("N", 3.1, 5.7)],
+    # schwebende Wandregale: (seite, versatz_von, versatz_bis, [Oberkanten über Fußboden])
+    "wandregal": ("O", 1.1, 2.5, [1.25, 1.70]),
     # Vorhänge: (seite, versatz-mitte, breite) an der Innenwand
     "vorhaenge": [("S", 4.3, 0.7), ("S", -2.85, 0.6), ("S", -0.35, 0.6),
                   ("O", -1.05, 0.6), ("O", 1.05, 0.6), ("W", -0.05, 0.6), ("W", 2.05, 0.6)],

@@ -70,7 +70,8 @@ def _innen_faerben(o, breite, tiefe, wand, z_unten, z_oben, mat):
     me = o.data
     me.materials.append(mat)
     idx = len(me.materials) - 1
-    gx, gy = breite / 2 - wand + 0.005, tiefe / 2 - wand + 0.005
+    # alles, was nicht auf der Außenfläche liegt (Innenwände, Fensterlaibungen), bekommt den Innenanstrich
+    gx, gy = breite / 2 - 0.01, tiefe / 2 - 0.01
     for p in me.polygons:
         c = p.center
         if abs(c.x) <= gx and abs(c.y) <= gy and z_unten - 0.005 <= c.z <= z_oben + 0.005:
