@@ -51,6 +51,11 @@ ROLLEN = {
     "modelle_korb": ("models", ["basket"]),
     "tex_teppich": ("textures", ["wool", "carpet", "fabric"]),
     "tex_vorhang": ("textures", ["linen", "fabric"]),
+    "tex_aussenputz": ("textures", ["stucco", "plaster"]),
+    "tex_tapete": ("textures", ["jacquard", "wallpaper", "fabric"]),
+    "tex_teppich_hochflor": ("textures", ["teddy", "wool"]),
+    "tex_teppich_boucle": ("textures", ["boucle", "wool"]),
+    "modelle_bild_2": ("models", ["picture_frame"]),
 }
 AUFLOESUNG = {"hdris": "4k", "textures": "2k", "models": "2k"}
 KARTEN = {"Diffuse": ("jpg", "png"), "Rough": ("jpg", "png"), "Displacement": ("png", "jpg")}

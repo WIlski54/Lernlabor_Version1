@@ -69,6 +69,12 @@ def heckenblatt_bibliothek_lauf():
 
 
 def hecken():
+    """Neue, detaillierte Hecke (siehe hecke.py)."""
+    from . import hecke
+    return hecke.baue()
+
+
+def hecken_alt():
     leere("01c_Heckenkern")
     leere("05g_Hecke")
     heckenblatt_bibliothek()

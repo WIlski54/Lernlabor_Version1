@@ -8,7 +8,8 @@ import bpy
 from .util import pfad
 
 TEXTUR_MATS = {
-    "M_Putz": dict(rolle="tex_putz", skala=2.0, schmutz=0.45),
+    # feiner Körnungsputz (Außen): kleine Skala, kräftiges Relief, warmweiß, nur dezente Verschmutzung
+    "M_Putz": dict(rolle="tex_aussenputz", skala=0.9, tint=(1.12, 1.09, 1.02), bump=0.9, rauheit_min=0.8, schmutz=0.22),
     "M_Sockel": dict(rolle="tex_putz", skala=1.5, tint=(0.2, 0.2, 0.21), schmutz=0.3),
     "M_Holzfassade": dict(rolle="tex_holzfassade", skala=2.0, vertikal=True, insel_variation=0.18),
     "M_Traufe": dict(rolle="tex_holzfassade", skala=2.0, tint=(0.95, 0.8, 0.65), vertikal=True),

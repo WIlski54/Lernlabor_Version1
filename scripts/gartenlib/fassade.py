@@ -118,6 +118,18 @@ def fensterbaenke(eltern, breite, tiefe, oeffnungen, z_boden, mat, vorstand=0.05
     return o
 
 
+def tropfkante(eltern, breite, tiefe, z, mat):
+    """Metall-Tropfkante als Schattenfuge zwischen Putz (unten) und Holzschalung (oben)."""
+    bm = bmesh.new()
+    for seite in ("S", "N", "O", "W"):
+        laenge = _seitenlaenge(seite, breite, tiefe)
+        p, n = _wandpunkt(seite, 0.0, breite, tiefe)
+        bm_box(bm, _quer(n, laenge + 0.12, 0.06, 0.03), p + n * 0.03 + Vector((0, 0, z)))
+    o = mesh_aus_bmesh(f"{eltern.name}_Tropfkante", bm, S, eltern, [mat])
+    fase(o, 0.003, 1)
+    return o
+
+
 def leuchten(eltern, breite, tiefe, positionen, mat):
     bm = bmesh.new()
     for seite, versatz, z in positionen:
@@ -143,7 +155,8 @@ def baue():
 
     z_dach = H["eg_h"] + H["og_h"]
     ue = H["dach_ueberstand"]
-    bretter(haus, b, t, H["eg_h"], z_dach, L.HAUS_OG_OEFFNUNGEN, H["eg_h"], holz)
+    bretter(haus, b, t, H["eg_h"] + 0.05, z_dach, L.HAUS_OG_OEFFNUNGEN, H["eg_h"], holz)
+    tropfkante(haus, b, t, H["eg_h"] + 0.02, rinne)
     rinnen("Haus_Rinnen", haus, b, t, ue, z_dach, rinne,
            fallrohre=[(sx * (b / 2 - 0.25), -t / 2 - 0.07, sx * (b / 2 - 0.25), -t / 2 - ue - 0.06) for sx in (-1, 1)])
     rinnen("Vordach_Rinne", haus, V["breite"], V["tiefe"], V["ueberstand"], V["hoehe"], rinne,

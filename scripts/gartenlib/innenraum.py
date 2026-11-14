@@ -252,6 +252,8 @@ def _kamera(haus, name="Kamera_Innen", schluessel="kamera"):
 def baue():
     log = []
     leere(S)
+    # verwaiste Möbel-Materialien/-Bilder früherer Läufe entfernen (sonst wachsen Datei und GPU-Speicher)
+    bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
     haus = bpy.data.objects["Haus"]
     I = L.INNEN
     boxen_objekt("Innen_Boden", [((I["breite"], I["tiefe"], 0.02), (0.0, 0.0, I["boden_z"] + 0.01))], S, haus,
