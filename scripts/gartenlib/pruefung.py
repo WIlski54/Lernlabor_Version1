@@ -274,3 +274,16 @@ def lauf():
     if fps < 25.0:
         f.append(f"nur {fps:.1f} fps im Modus Laufen")
     return _e(f, fps=fps)
+
+
+def labor():
+    f = [f"fehlt {n}" for n in ("Labor_Boden", "Labor_Mikroskop", "Whiteboard_Flaeche", "Labor_Arbeitsinsel_Platte",
+                                 "Labor_Sammelglaeser") if n not in bpy.data.objects]
+    if any(o.name.startswith("Moebel_") for o in bpy.data.objects):
+        f.append("Wohnungsmöbel noch vorhanden")
+    if not bpy.data.filepath.lower().endswith("labor.blend"):
+        f.append("nicht in labor.blend")
+    tuer = architektur()
+    if not tuer["ok"]:
+        f += tuer["fehler"]
+    return _e(f)
