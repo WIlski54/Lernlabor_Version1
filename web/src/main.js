@@ -35,12 +35,15 @@ const { konfig } = welt;
 const augen = konfig.augenhoehe;
 const kollision = new Kollision(welt.kollisionWaende, welt.kollisionBoden);
 const gras = new Gras(szene, welt.rasenmaske);
-const fuss = new THREE.Vector3(konfig.start.position[0], 0, konfig.start.position[2]);
-// Strahl ab Augenhöhe des Startpunkts nach unten (nicht ab 5 m, sonst träfe er ein Obergeschoss/Dach)
-fuss.y = kollision.bodenHoehe(fuss.x, konfig.start.position[1], fuss.z, 0) ?? 0;
+const labor = new URLSearchParams(location.search).has('labor') && konfig.labor_start;
+const start = labor ? konfig.labor_start : konfig.start;
+const fuss = new THREE.Vector3(start.position[0], 0, start.position[2]);
+// Strahl ab Augenhöhe nach unten (nicht ab 5 m, sonst träfe er ein Obergeschoss/Dach);
+// im Labor liegt der Startpunkt auf Fußhöhe, der Strahl beginnt 1 m darüber (Decke ≈ 2,75 m)
+fuss.y = kollision.bodenHoehe(fuss.x, start.position[1], fuss.z, labor ? 1.0 : 0) ?? 0;
 let fallTempo = 0;
 
-const steuerung = new Steuerung(canvas, document.getElementById('joystick'), document.getElementById('joystick-knauf'), konfig.start.yaw);
+const steuerung = new Steuerung(canvas, document.getElementById('joystick'), document.getElementById('joystick-knauf'), start.yaw);
 const startEl = document.getElementById('start');
 document.getElementById('start-hinweis').textContent = steuerung.touch
   ? 'Links ziehen = gehen · rechts wischen = umschauen'
@@ -49,7 +52,10 @@ startEl.hidden = false;
 document.getElementById('start-knopf').addEventListener('click', () => {
   startEl.hidden = true;
   if (steuerung.touch) document.getElementById('joystick').hidden = false;
-  else { canvas.requestPointerLock(); document.getElementById('fadenkreuz').hidden = false; }
+  else {
+    try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* z. B. eingebettetes Fenster: Maus-Ziehen statt Pointer Lock */ }
+    document.getElementById('fadenkreuz').hidden = false;
+  }
 });
 document.addEventListener('pointerlockchange', () => {
   if (!steuerung.touch && document.pointerLockElement !== canvas) startEl.hidden = false;

@@ -130,8 +130,12 @@ def weltkonfig(ziel):
     sonne = bpy.data.objects["Sonne"].matrix_world.to_3x3() @ Vector((0, 0, -1))
     mik = bpy.data.objects["Labor_Mikroskop"]
     mitte_mik = mik.matrix_world @ (sum((Vector(c) for c in mik.bound_box), Vector()) / 8)
+    haus = bpy.data.objects["Haus"]
+    lpos = drei(haus.matrix_world @ Vector((-2.0, 2.4, L.INNEN["boden_z"])))
+    ld = drei(haus.matrix_world.to_3x3() @ Vector((0, 1, 0)))
     konf = {
         "start": {"position": drei(cam.matrix_world.translation), "yaw": round(math.atan2(-v3[0], -v3[2]), 4)},
+        "labor_start": {"position": lpos, "yaw": round(math.atan2(-ld[0], -ld[2]), 4)},
         "sonne_richtung": drei(sonne),
         "mikroskop": drei(mitte_mik),
         "whiteboard": "Whiteboard_Flaeche",
@@ -373,11 +377,23 @@ def _zweige_entfernen(o, flaeche_min):
 
 
 def _rampenfarbe(m):
-    for n in m.node_tree.nodes if m and m.use_nodes else []:
-        if n.type == "VALTORGB":
-            return tuple(n.color_ramp.evaluate(0.5))[:3]
-        if n.type == "BSDF_PRINCIPLED" and not n.inputs["Base Color"].is_linked:
-            return tuple(n.inputs["Base Color"].default_value)[:3]
+    """Blattfarbe: der Farbverlauf, der wirklich in Principled 'Base Color' einspeist
+    (nicht eine Alpha-/Formmaske); sonst Basisfarbe des Principled."""
+    if not (m and m.use_nodes):
+        return (0.1, 0.2, 0.05)
+    for p in (n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"):
+        eing = p.inputs["Base Color"]
+        if not eing.is_linked:
+            return tuple(eing.default_value)[:3]
+        stapel, gesehen = [eing.links[0].from_node], set()
+        while stapel:
+            n = stapel.pop(0)
+            if n in gesehen:
+                continue
+            gesehen.add(n)
+            if n.type == "VALTORGB":
+                return tuple(n.color_ramp.evaluate(0.5))[:3]
+            stapel += [l.from_node for i in n.inputs for l in i.links]
     return (0.1, 0.2, 0.05)
 
 
@@ -389,9 +405,8 @@ def _einfache_materialien(o):
         b.inputs["Base Color"].default_value = (*_rampenfarbe(m), 1.0)
         b.inputs["Roughness"].default_value = 0.8
         neu.append(wm)
-    o.data.materials.clear()
-    for wm in neu:
-        o.data.materials.append(wm)
+    for i, wm in enumerate(neu):       # Slots einzeln ersetzen: materials.clear() setzt alle Flächen auf Slot 0
+        o.data.materials[i] = wm
 
 
 def _instanzdaten(dg, filter_fn):

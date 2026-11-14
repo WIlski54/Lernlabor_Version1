@@ -14,8 +14,12 @@ export class Steuerung {
     this.knaufEl = knaufEl;
     addEventListener('keydown', (e) => this.tasten.add(e.code));
     addEventListener('keyup', (e) => this.tasten.delete(e.code));
+    // Ohne Pointer Lock (z. B. eingebettet): Umschauen durch Ziehen mit der linken Maustaste
+    this.ziehen = false;
+    canvas.addEventListener('mousedown', (e) => { if (e.button === 0 && !this.touch) this.ziehen = true; });
+    addEventListener('mouseup', () => { this.ziehen = false; });
     canvas.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement !== canvas) return;
+      if (document.pointerLockElement !== canvas && !(this.ziehen && !this.touch)) return;
       this.drehen(e.movementX * 0.0022, e.movementY * 0.0022);
     });
     canvas.addEventListener('touchstart', (e) => this.touchStart(e), { passive: false });
