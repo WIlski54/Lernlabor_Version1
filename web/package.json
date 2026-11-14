@@ -1,0 +1,24 @@
+{
+  "name": "garten-labor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "test": "vitest run",
+    "optimieren": "node tools/optimieren.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0",
+    "three-mesh-bvh": "^0.9.18"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12"
+  }
+}

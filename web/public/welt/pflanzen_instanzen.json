@@ -1,0 +1,82 @@
+{
+ "Heckenballen_Lauf_0": {
+  "offset": 0,
+  "anzahl": 331
+ },
+ "Heckenballen_Lauf_1": {
+  "offset": 331,
+  "anzahl": 330
+ },
+ "Heckenballen_Lauf_2": {
+  "offset": 661,
+  "anzahl": 337
+ },
+ "Heckenballen_Lauf_3": {
+  "offset": 998,
+  "anzahl": 332
+ },
+ "Kiefernpolster_0": {
+  "offset": 1330,
+  "anzahl": 6
+ },
+ "Kiefernpolster_1": {
+  "offset": 1336,
+  "anzahl": 8
+ },
+ "Kiefernpolster_2": {
+  "offset": 1344,
+  "anzahl": 5
+ },
+ "Rasenstueck_Lauf_0": {
+  "offset": 1349,
+  "anzahl": 50
+ },
+ "Rasenstueck_Lauf_1": {
+  "offset": 1399,
+  "anzahl": 36
+ },
+ "Rasenstueck_Lauf_2": {
+  "offset": 1435,
+  "anzahl": 48
+ },
+ "Rasenstueck_Lauf_3": {
+  "offset": 1483,
+  "anzahl": 40
+ },
+ "Staude_0": {
+  "offset": 1523,
+  "anzahl": 31
+ },
+ "Staude_1": {
+  "offset": 1554,
+  "anzahl": 36
+ },
+ "Staude_2": {
+  "offset": 1590,
+  "anzahl": 21
+ },
+ "Staude_3": {
+  "offset": 1611,
+  "anzahl": 23
+ },
+ "Ziergras_0": {
+  "offset": 1634,
+  "anzahl": 7
+ },
+ "Ziergras_1": {
+  "offset": 1641,
+  "anzahl": 8
+ },
+ "Ziergras_2": {
+  "offset": 1649,
+  "anzahl": 8
+ },
+ "Ziergras_3": {
+  "offset": 1657,
+  "anzahl": 11
+ },
+ "Ziergras_4": {
+  "offset": 1668,
+  "anzahl": 5
+ }
+}

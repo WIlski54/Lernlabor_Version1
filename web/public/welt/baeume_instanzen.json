@@ -1,0 +1,18 @@
+{
+ "WEBK_Kulisse_Ahorn_A": {
+  "offset": 0,
+  "anzahl": 6
+ },
+ "WEBK_Kulisse_Ahorn_B": {
+  "offset": 6,
+  "anzahl": 6
+ },
+ "WEBK_Kulisse_Birke_A": {
+  "offset": 12,
+  "anzahl": 7
+ },
+ "WEBK_Kulisse_Birke_B": {
+  "offset": 19,
+  "anzahl": 7
+ }
+}
