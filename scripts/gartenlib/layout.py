@@ -114,8 +114,20 @@ INNEN = {
     "boden_z": 0.15, "decke_z": 2.75, "breite": 11.4, "tiefe": 8.4,
     "kueche": {"zeile": ((2.3, 3.89), (3.6, 0.62)), "hochschrank": ((4.9, 3.89), (1.2, 0.62)),
                "insel": ((2.3, 1.7), (2.4, 0.9))},
-    # (rolle, name, (x, y), drehung_grad, an_decke) – Annahme: Poly-Haven-Möbel zeigen mit der Front nach -Y
+    # (rolle, name, (x, y), drehung_grad, höhe) – Annahme: Poly-Haven-Möbel zeigen mit der Front nach -Y.
+    # höhe: False = Boden, True = an der Decke, Zahl = Meter über Fußboden, "auf:<Name>" = auf einem Möbel
     "moebel": [
+        ("modelle_regal", "Regal", (5.45, -2.2), -90.0, False),
+        ("modelle_buecher", "Buecher", (5.45, -2.05), -90.0, "auf:Regal"),
+        ("modelle_vase_2", "Vase_Regal", (5.45, -2.65), 0.0, "auf:Regal"),
+        ("modelle_sideboard", "Sideboard", (-5.42, 2.3), 90.0, False),
+        ("modelle_bild_stehend", "Bild_Sideboard", (-5.5, 1.85), 90.0, "auf:Sideboard"),
+        ("modelle_vase", "Vase_Sideboard", (-5.42, 2.8), 0.0, "auf:Sideboard"),
+        ("modelle_bild", "Wandbild", (-5.66, 2.3), 90.0, 1.55),
+        ("modelle_korb", "Korb", (-4.7, -0.8), 0.0, False),
+        ("modelle_barhocker", "Barhocker_1", (1.5, 0.85), 0.0, False),
+        ("modelle_barhocker", "Barhocker_2", (2.3, 0.85), 0.0, False),
+        ("modelle_barhocker", "Barhocker_3", (3.1, 0.85), 0.0, False),
         ("modelle_sofa", "Sofa", (-2.8, -0.6), 0.0, False),
         ("modelle_couchtisch", "Couchtisch", (-2.8, -2.0), 0.0, False),
         ("modelle_sessel_innen", "Sessel_Innen", (-4.8, -2.2), -90.0, False),
@@ -125,9 +137,17 @@ INNEN = {
         ("modelle_stuhl", "Stuhl_3", (-2.6, 3.05), 0.0, False),
         ("modelle_stuhl", "Stuhl_4", (-1.8, 3.05), 0.0, False),
         ("modelle_lampe", "Pendelleuchte", (-2.2, 2.4), 0.0, True),
+        ("modelle_lampe", "Pendel_Insel_1", (1.7, 1.6), 0.0, True),
+        ("modelle_lampe", "Pendel_Insel_2", (2.9, 1.6), 0.0, True),
         ("modelle_zimmerpflanze", "Pflanze_1", (5.1, -3.6), 0.0, False),
         ("modelle_zimmerpflanze_2", "Pflanze_2", (-5.2, 3.6), 0.0, False),
+        ("modelle_kissen", "Kissen", (-2.8, -0.5), 0.0, 0.42),
+        ("modelle_schale", "Schale", (-2.2, 2.4), 0.0, "auf:Esstisch"),
     ],
+    "teppich": ((-2.8, -1.7), (2.6, 1.8)),
+    # Vorhänge: (seite, versatz-mitte, breite) an der Innenwand
+    "vorhaenge": [("S", 4.3, 0.7), ("S", -2.85, 0.6), ("S", -0.35, 0.6),
+                  ("O", -1.05, 0.6), ("O", 1.05, 0.6), ("W", -0.05, 0.6), ("W", 2.05, 0.6)],
     # (name, typ, (x, y, z), leistung_w, größe_m)
     "lichter": [
         ("Licht_Essen", "POINT", (-2.2, 2.4, 2.05), 60.0, 0.1),
@@ -135,6 +155,9 @@ INNEN = {
         ("Licht_Kueche", "AREA", (2.3, 2.8, 2.70), 150.0, 1.0),
     ],
     "kamera": {"ort": (4.6, 3.2, 1.6), "ziel": (-3.0, -2.0, 1.1), "brennweite": 18.0},
+    "kamera_2": {"ort": (-5.0, -3.5, 1.6), "ziel": (3.5, 2.0, 1.0), "brennweite": 18.0},
+    # Skalierung je Möbeltyp (Name ohne Nummer): Barhocker auf Thekenhöhe (~68 cm) strecken
+    "skalierung": {"Barhocker": (1.1, 1.1, 1.5)},
 }
 
 # ---------------------------------------------------------------- Teil 2: Laufen

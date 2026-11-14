@@ -8,8 +8,9 @@ import bpy
 from .util import pfad
 
 TEXTUR_MATS = {
-    "M_Putz": dict(rolle="tex_putz", skala=2.0),
-    "M_Holzfassade": dict(rolle="tex_holzfassade", skala=2.0, vertikal=True),
+    "M_Putz": dict(rolle="tex_putz", skala=2.0, schmutz=0.45),
+    "M_Sockel": dict(rolle="tex_putz", skala=1.5, tint=(0.2, 0.2, 0.21), schmutz=0.3),
+    "M_Holzfassade": dict(rolle="tex_holzfassade", skala=2.0, vertikal=True, insel_variation=0.18),
     "M_Traufe": dict(rolle="tex_holzfassade", skala=2.0, tint=(0.95, 0.8, 0.65), vertikal=True),
     "M_Dachblech": dict(rolle="tex_dachblech", skala=1.5, tint=(0.25, 0.25, 0.27)),
     "M_Dachziegel": dict(rolle="tex_dachziegel", skala=1.5),
@@ -21,6 +22,8 @@ TEXTUR_MATS = {
     "M_Erde": dict(rolle="tex_beet", skala=1.5, tint=(0.25, 0.32, 0.15)),
     "M_Rinde_Ahorn": dict(rolle="tex_rinde_ahorn", skala=0.8),
     "M_Parkett": dict(rolle="tex_parkett", skala=2.0),
+    "M_Teppich": dict(rolle="tex_teppich", skala=0.6, rauheit_min=0.85),
+    "M_Vorhang": dict(rolle="tex_vorhang", skala=0.8, grau=True, tint=(0.95, 0.91, 0.84), rauheit_min=0.85),
     "M_Arbeitsplatte": dict(rolle="tex_arbeitsplatte", skala=3.0, rauheit_min=0.25),
 }
 
@@ -129,8 +132,43 @@ def _zell_variation(nt, vektor, groesse):
     return mr.outputs["Result"]
 
 
+def _schmutz(nt, farbe, staerke):
+    """Dunkelt Fassaden unten (Spritzwasser) und in Ecken/Fugen (Ambient Occlusion) leicht ab."""
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(geo.outputs["Position"], sep.inputs[0])
+    unten = nt.nodes.new("ShaderNodeMapRange")
+    unten.inputs["From Min"].default_value = 0.0
+    unten.inputs["From Max"].default_value = 0.7
+    unten.inputs["To Min"].default_value = 1.0
+    unten.inputs["To Max"].default_value = 0.0
+    nt.links.new(sep.outputs["Z"], unten.inputs["Value"])
+    rausch = nt.nodes.new("ShaderNodeTexNoise")
+    rausch.inputs["Scale"].default_value = 3.0
+    rausch.inputs["Detail"].default_value = 6.0
+    f_unten = mathe(nt, "MULTIPLY", mathe(nt, "MULTIPLY", unten.outputs["Result"], rausch.outputs["Fac"]), staerke * 1.6)
+    farbe = mix_farbe(nt, farbe, (0.55, 0.52, 0.47), mathe(nt, "MINIMUM", f_unten, 1.0), "MULTIPLY")
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = 0.4
+    f_ao = mathe(nt, "MULTIPLY", mathe(nt, "SUBTRACT", 1.0, ao.outputs["AO"]), staerke)
+    return mix_farbe(nt, farbe, (0.5, 0.48, 0.45), f_ao, "MULTIPLY")
+
+
+def _insel_variation(nt, farbe, k):
+    """Helligkeit je Mesh-Insel (z. B. je Fassadenbrett) um ±k variieren."""
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["To Min"].default_value = 1.0 - k
+    mr.inputs["To Max"].default_value = 1.0 + k
+    nt.links.new(geo.outputs["Random Per Island"], mr.inputs["Value"])
+    kom = nt.nodes.new("ShaderNodeCombineColor")
+    for i in range(3):
+        nt.links.new(mr.outputs["Result"], kom.inputs[i])
+    return mix_farbe(nt, farbe, kom.outputs[0], 1.0, "MULTIPLY")
+
+
 def pbr(name, rolle, skala=1.0, tint=None, vertikal=False, verschiebung=0.0, bump=0.4, fugen=None, fugen_groesse=0.6,
-        rauheit_min=0.0):
+        rauheit_min=0.0, insel_variation=0.0, schmutz=0.0, grau=False):
     ordner = pfad("assets", "polyhaven", "textures", auswahl()[rolle])
     diff = _karte(ordner, "_diff_")
     if diff is None:
@@ -159,8 +197,20 @@ def pbr(name, rolle, skala=1.0, tint=None, vertikal=False, verschiebung=0.0, bum
     vek = mp.outputs["Vector"]
 
     farbe = _bild(nt, diff, True, vek).outputs["Color"]
+    if grau:  # Farbe der Textur verwerfen, nur Helligkeitsstruktur behalten (z. B. blaues Leinen → cremeweiß)
+        bw = nt.nodes.new("ShaderNodeRGBToBW")
+        nt.links.new(farbe, bw.inputs[0])
+        hell = mathe(nt, "MULTIPLY", bw.outputs[0], 1.6)
+        kom = nt.nodes.new("ShaderNodeCombineColor")
+        for i in range(3):
+            nt.links.new(hell, kom.inputs[i])
+        farbe = kom.outputs[0]
     if tint:
         farbe = mix_farbe(nt, farbe, tint, 1.0, "MULTIPLY")
+    if insel_variation > 0:
+        farbe = _insel_variation(nt, farbe, insel_variation)
+    if schmutz > 0:
+        farbe = _schmutz(nt, farbe, schmutz)
     rough_datei = _karte(ordner, "_rough_")
     rauheit = _bild(nt, rough_datei, False, vek).outputs["Color"] if rough_datei else 0.7
     disp_datei = _karte(ordner, "_disp_")

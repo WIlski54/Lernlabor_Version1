@@ -38,6 +38,19 @@ ROLLEN = {
     "modelle_zimmerpflanze": ("models", ["potted_plant"]),
     "modelle_zimmerpflanze_2": ("models", ["potted_plant"]),
     "modelle_teppich": ("models", ["rug", "carpet"]),
+    "modelle_barhocker": ("models", ["stool"]),
+    "modelle_sideboard": ("models", ["cabinet"]),
+    "modelle_regal": ("models", ["shelves", "shelf"]),
+    "modelle_buecher": ("models", ["book"]),
+    "modelle_bild": ("models", ["picture_frame"]),
+    "modelle_bild_stehend": ("models", ["picture_frame"]),
+    "modelle_kissen": ("models", ["pillow"]),
+    "modelle_vase": ("models", ["vase"]),
+    "modelle_vase_2": ("models", ["vase"]),
+    "modelle_schale": ("models", ["bowl"]),
+    "modelle_korb": ("models", ["basket"]),
+    "tex_teppich": ("textures", ["wool", "carpet", "fabric"]),
+    "tex_vorhang": ("textures", ["linen", "fabric"]),
 }
 AUFLOESUNG = {"hdris": "4k", "textures": "2k", "models": "2k"}
 KARTEN = {"Diffuse": ("jpg", "png"), "Rough": ("jpg", "png"), "Displacement": ("png", "jpg")}

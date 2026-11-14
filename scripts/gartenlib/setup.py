@@ -5,7 +5,7 @@ from .util import collection, layer_collection, neues_objekt, setze
 
 SAMMLUNGEN = [
     ("00_Steuerung", None), ("01_Gelaende", None), ("01a_Beete", "01_Gelaende"),
-    ("02_Architektur", None), ("03_Innenraum", None), ("04_Hardscape", None),
+    ("02_Architektur", None), ("02b_Fassade", "02_Architektur"), ("03_Innenraum", None), ("04_Hardscape", None),
     ("05_Pflanzen", None), ("05a_Rasen", "05_Pflanzen"), ("05b_Graeser", "05_Pflanzen"),
     ("05c_Stauden", "05_Pflanzen"), ("05d_Straeucher", "05_Pflanzen"), ("05e_Baeume", "05_Pflanzen"),
     ("05f_Kulisse", "05_Pflanzen"), ("06_Licht", None), ("07_Kameras", None),
