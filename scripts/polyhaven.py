@@ -27,6 +27,17 @@ ROLLEN = {
     "tex_beet": ("textures", ["mulch", "soil", "forest_ground", "forrest_ground", "mud"]),
     "tex_rinde_ahorn": ("textures", ["bark"]),
     "modelle_straeucher": ("models", ["shrub", "bush", "pine", "fern", "plant"]),
+    "tex_parkett": ("textures", ["wood_floor", "parquet", "laminate"]),
+    "tex_arbeitsplatte": ("textures", ["marble", "granite", "terrazzo"]),
+    "modelle_sofa": ("models", ["sofa", "couch"]),
+    "modelle_sessel_innen": ("models", ["armchair", "arm_chair"]),
+    "modelle_couchtisch": ("models", ["coffee_table", "side_table"]),
+    "modelle_esstisch": ("models", ["dining_table", "wooden_table", "table"]),
+    "modelle_stuhl": ("models", ["chair"]),
+    "modelle_lampe": ("models", ["ceiling_lamp", "floor_lamp", "lamp"]),
+    "modelle_zimmerpflanze": ("models", ["potted_plant"]),
+    "modelle_zimmerpflanze_2": ("models", ["potted_plant"]),
+    "modelle_teppich": ("models", ["rug", "carpet"]),
 }
 AUFLOESUNG = {"hdris": "4k", "textures": "2k", "models": "2k"}
 KARTEN = {"Diffuse": ("jpg", "png"), "Rough": ("jpg", "png"), "Displacement": ("png", "jpg")}
@@ -117,8 +128,10 @@ if __name__ == "__main__":
             print(rolle, [k["id"] for k in liste])
     elif befehl == "plan":
         p = plan()
-        for url, ziel, groesse in p:
+        fehlend = [(u, z, g) for u, z, g in p if not (os.path.exists(z) and os.path.getsize(z) == g)]
+        for url, ziel, groesse in fehlend:
             print(f"{groesse / 1e6:8.1f} MB  {os.path.relpath(ziel, PROJEKT)}")
-        print(f"GESAMT {sum(g for _, _, g in p) / 1e6:.0f} MB in {len(p)} Dateien")
+        print(f"NEU ZU LADEN: {sum(g for _, _, g in fehlend) / 1e6:.0f} MB in {len(fehlend)} Dateien "
+              f"({len(p) - len(fehlend)} schon vorhanden)")
     elif befehl == "lade":
         lade()

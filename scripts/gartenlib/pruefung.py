@@ -174,7 +174,7 @@ def rasen():
     modus_setzen(alt)
     mitte = Vector((*L.HOF["mitte"], 0))
     auf_hof = sum(1 for p in punkte if (Vector((p.x, p.y, 0)) - mitte).length < L.HOF["radius"] - 0.3)
-    if len(punkte) < 10000:
+    if len(punkte) < 3000:  # im Modus Laufen bewusst wenige große Rasenstücke (0,8 m) statt vieler Büschel
         f.append(f"nur {len(punkte)} Rasen-Instanzen im Modus Laufen")
     if auf_hof:
         f.append(f"{auf_hof} Grasbüschel wachsen auf den Hofplatten")

@@ -137,15 +137,36 @@ def halm_bibliothek():
         mesh_aus_bmesh(f"Halme_{k}", bm, "Bib_Halme", mats=[m])
 
 
+def halm_bibliothek_lauf():
+    """Rasenstücke für den Modus Laufen: 0,8 × 0,8 m mit je 160 breiteren Halmen (2 Segmente).
+    Wenige große Instanzen statt vieler kleiner – Eevee ist bei sehr vielen Instanzen der Engpass."""
+    leere("Bib_Halme_Lauf")
+    m = bpy.data.materials["M_Gras"]
+    rnd = random.Random(5)
+    for k in range(4):
+        bm = bmesh.new()
+        for _ in range(160):
+            x, y = rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4)
+            w = rnd.uniform(0, 2 * math.pi)
+            halm(bm, (x, y, 0.0), (math.cos(w), math.sin(w)), rnd.uniform(0.06, 0.12), 0.012,
+                 rnd.uniform(0.1, 0.4), segmente=2)
+        mesh_aus_bmesh(f"Rasenstueck_Lauf_{k}", bm, "Bib_Halme_Lauf", mats=[m])
+
+
 def rasen():
     leere("05a_Rasen")
     halm_bibliothek()
+    halm_bibliothek_lauf()
     x0, y0, x1, y1 = L.GRUNDSTUECK
     bm = bmesh.new()
     bm.faces.new([bm.verts.new(p) for p in [(x0, y0, 0), (x1, y0, 0), (x1, y1, 0), (x0, y1, 0)]])
     o = mesh_aus_bmesh("Rasen", bm, "05a_Rasen", mats=[material("M_Erde", (0.05, 0.06, 0.03), 0.95)])
-    gn.anwenden(o, "Rasen", "Bib_Halme", "Maske_Rasen", dichte_lauf=60, dichte_schoen=500, abstand=0.03,
-                skala=(0.7, 1.2), neigung=0.15, seed=1, basis=True)
+    gn.anwenden(o, "Rasen", "Bib_Halme", "Maske_Rasen", dichte_lauf=5, dichte_schoen=500, abstand=0.03,
+                skala=(0.7, 1.2), neigung=0.15, seed=1, basis=True, bibliothek_lauf="Bib_Halme_Lauf")
+    # Rasenstücke (0,8 m) brauchen beim Laufen mehr Abstand zu Platten/Wegen, sonst stechen Halme durch
+    from .util import gn_kennung, treiber_modus
+    k = gn_kennung(o.modifiers["Rasen"].node_group, "Ausschluss_Abstand")
+    treiber_modus(o, f'modifiers["Rasen"]["{k}"]', "0.05 + 0.35 * (1.0 - m)")
     return {"rasen": o.name}
 
 
@@ -267,7 +288,8 @@ def bepflanzung():
             o = bpy.data.objects.new(f"Pflanzung_{beet}_{bib}", quelle.data)
             bpy.data.collections[ziel].objects.link(o)
             gn.anwenden(o, "Streuen", bib, "Maske_Beet", d_lauf, d_schoen, abstand, skala, 0.12,
-                        seed=nr * 10 + i, basis=False, ausschluss_abstand=0.15)
+                        seed=nr * 10 + i, basis=False, ausschluss_abstand=0.15,
+                        bibliothek_lauf="Bib_Halme_Lauf" if bib == "Bib_Halme" else None)
     return {"beete": len(L.BEPFLANZUNG)}
 
 

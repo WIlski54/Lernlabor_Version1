@@ -25,8 +25,8 @@ def wiese():
                       bm.verts.new((b[0], b[1], 0)), bm.verts.new((a[0], b[1], 0))])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
     o = mesh_aus_bmesh("Wiese", bm, "01b_Wiese", mats=[material("M_Erde")])
-    gn.anwenden(o, "Wiese", "Bib_Halme", "Maske_Beet", dichte_lauf=4, dichte_schoen=40, abstand=0.06,
-                skala=(0.9, 1.6), neigung=0.2, seed=7, basis=True)
+    gn.anwenden(o, "Wiese", "Bib_Halme", "Maske_Beet", dichte_lauf=0.6, dichte_schoen=40, abstand=0.06,
+                skala=(0.9, 1.6), neigung=0.2, seed=7, basis=True, bibliothek_lauf="Bib_Halme_Lauf")
     return {"wiese": o.name}
 
 
@@ -50,10 +50,29 @@ def heckenblatt_bibliothek():
         mesh_aus_bmesh(f"Heckenblaetter_{k}", bm, "Bib_Heckenblatt", mats=[m])
 
 
+def heckenblatt_bibliothek_lauf():
+    """Leichte Blattgruppen ohne Alpha-Ausschnitt (deckend, größer) für den Modus Laufen."""
+    leere("Bib_Heckenblatt_Lauf")
+    m = pflanzen_material("M_Heckenblatt_Lauf", [(0.0, (0.02, 0.05, 0.012)), (0.6, (0.035, 0.08, 0.018)),
+                                                 (1.0, (0.06, 0.11, 0.025))], durchscheinend=0.2)
+    rnd = random.Random(37)
+    for k in range(4):
+        bm = bmesh.new()
+        for _ in range(30):  # großer Blattballen, damit wenige Instanzen reichen
+            c = Vector((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), rnd.uniform(-0.15, 0.15)))
+            l = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 1))).normalized()
+            w = l.cross(Vector((0.3, 0.2, 1.0))).normalized()
+            b, hh = rnd.uniform(0.09, 0.12), rnd.uniform(0.1, 0.13)
+            bm.faces.new([bm.verts.new(p) for p in (c - w * b / 2, c + w * b / 2, c + l * hh + w * b * 0.3,
+                                                     c + l * hh - w * b * 0.3)])
+        mesh_aus_bmesh(f"Heckenblaetter_Lauf_{k}", bm, "Bib_Heckenblatt_Lauf", mats=[m])
+
+
 def hecken():
     leere("01c_Heckenkern")
     leere("05g_Hecke")
     heckenblatt_bibliothek()
+    heckenblatt_bibliothek_lauf()
     kern_mat = material("M_Hecke_Kern", (0.01, 0.025, 0.008), 0.9)
     hoehe, tiefe = L.HECKE_MASS["hoehe"], L.HECKE_MASS["tiefe"]
     for i, (a, b) in enumerate(L.HECKEN):
@@ -72,8 +91,9 @@ def hecken():
         laub = bpy.data.objects.new(f"Hecke_{i + 1}_Laub", kern.data)
         bpy.data.collections["05g_Hecke"].objects.link(laub)
         laub.location, laub.rotation_euler = kern.location, kern.rotation_euler
-        gn.anwenden(laub, "Streuen", "Bib_Heckenblatt", "Maske_Beet", dichte_lauf=120, dichte_schoen=500,
-                    abstand=0.03, skala=(0.8, 1.3), neigung=3.14, seed=40 + i, basis=False)
+        gn.anwenden(laub, "Streuen", "Bib_Heckenblatt", "Maske_Beet", dichte_lauf=5, dichte_schoen=500,
+                    abstand=0.03, skala=(0.8, 1.3), neigung=3.14, seed=40 + i, basis=False,
+                    bibliothek_lauf="Bib_Heckenblatt_Lauf")
     return {"hecken": len(L.HECKEN)}
 
 

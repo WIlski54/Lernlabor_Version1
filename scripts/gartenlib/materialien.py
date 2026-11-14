@@ -20,6 +20,8 @@ TEXTUR_MATS = {
     "M_Beet": dict(rolle="tex_beet", skala=1.5, tint=(0.45, 0.4, 0.35)),
     "M_Erde": dict(rolle="tex_beet", skala=1.5, tint=(0.25, 0.32, 0.15)),
     "M_Rinde_Ahorn": dict(rolle="tex_rinde_ahorn", skala=0.8),
+    "M_Parkett": dict(rolle="tex_parkett", skala=2.0),
+    "M_Arbeitsplatte": dict(rolle="tex_arbeitsplatte", skala=3.0, rauheit_min=0.25),
 }
 
 

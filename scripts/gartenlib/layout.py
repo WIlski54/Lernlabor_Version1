@@ -69,7 +69,8 @@ def _mix(graeser=1.0, stauden=1.0, polster=1.0, kiefer=1.0, boden=1.0):
         ("Bib_Stauden", "05c_Stauden", 1.0 * stauden, 2.5 * stauden, 0.3, (0.8, 1.2)),
         ("Bib_Polster", "05d_Straeucher", 0.1 * polster, 0.25 * polster, 1.0, (0.6, 1.0)),
         ("Bib_Kiefer", "05d_Straeucher", 0.15 * kiefer, 0.4 * kiefer, 0.9, (0.8, 1.7)),
-        ("Bib_Halme", "05b_Graeser", 20.0 * boden, 80.0 * boden, 0.06, (0.8, 1.5)),
+        # im Modus Laufen werden hier Rasenstücke (0,8 m) statt Büschel gestreut, daher die kleine Laufdichte
+        ("Bib_Halme", "05b_Graeser", 1.5 * boden, 80.0 * boden, 0.06, (0.8, 1.5)),
     ]
 
 
@@ -105,3 +106,36 @@ KULISSE = {
     "vorlagen": [("Kulisse_Birke_A", "birke", 15.0, 11), ("Kulisse_Birke_B", "birke", 13.0, 12),
                  ("Kulisse_Ahorn_A", "ahorn", 12.0, 13), ("Kulisse_Ahorn_B", "ahorn", 14.0, 14)],
 }
+
+# ---------------------------------------------------------------- Teil 2: Erdgeschoss innen (Haus-lokale Koordinaten)
+# Innenraum: x -5,7 … 5,7, y -4,2 … 4,2, Fußboden z 0,15, Decke z 2,75.
+# Terrassentür offen bei x 1,3 … 2,6 an der Südwand – dieser Streifen bleibt frei.
+INNEN = {
+    "boden_z": 0.15, "decke_z": 2.75, "breite": 11.4, "tiefe": 8.4,
+    "kueche": {"zeile": ((2.3, 3.89), (3.6, 0.62)), "hochschrank": ((4.9, 3.89), (1.2, 0.62)),
+               "insel": ((2.3, 1.7), (2.4, 0.9))},
+    # (rolle, name, (x, y), drehung_grad, an_decke) – Annahme: Poly-Haven-Möbel zeigen mit der Front nach -Y
+    "moebel": [
+        ("modelle_sofa", "Sofa", (-2.8, -0.6), 0.0, False),
+        ("modelle_couchtisch", "Couchtisch", (-2.8, -2.0), 0.0, False),
+        ("modelle_sessel_innen", "Sessel_Innen", (-4.8, -2.2), -90.0, False),
+        ("modelle_esstisch", "Esstisch", (-2.2, 2.4), 0.0, False),
+        ("modelle_stuhl", "Stuhl_1", (-2.6, 1.75), 180.0, False),
+        ("modelle_stuhl", "Stuhl_2", (-1.8, 1.75), 180.0, False),
+        ("modelle_stuhl", "Stuhl_3", (-2.6, 3.05), 0.0, False),
+        ("modelle_stuhl", "Stuhl_4", (-1.8, 3.05), 0.0, False),
+        ("modelle_lampe", "Pendelleuchte", (-2.2, 2.4), 0.0, True),
+        ("modelle_zimmerpflanze", "Pflanze_1", (5.1, -3.6), 0.0, False),
+        ("modelle_zimmerpflanze_2", "Pflanze_2", (-5.2, 3.6), 0.0, False),
+    ],
+    # (name, typ, (x, y, z), leistung_w, größe_m)
+    "lichter": [
+        ("Licht_Essen", "POINT", (-2.2, 2.4, 2.05), 60.0, 0.1),
+        ("Licht_Wohnen", "AREA", (-2.8, -1.5, 2.70), 150.0, 1.2),
+        ("Licht_Kueche", "AREA", (2.3, 2.8, 2.70), 150.0, 1.0),
+    ],
+    "kamera": {"ort": (4.6, 3.2, 1.6), "ziel": (-3.0, -2.0, 1.1), "brennweite": 18.0},
+}
+
+# ---------------------------------------------------------------- Teil 2: Laufen
+KAMERA_LAUFEN = {"ort": (3.8, -8.6, 1.7), "ziel": (-2.3, 4.0, 1.6), "brennweite": 24.0}

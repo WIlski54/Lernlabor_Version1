@@ -22,7 +22,9 @@ def streuer():
     i.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     i.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     i.new_socket("Bibliothek", in_out="INPUT", socket_type="NodeSocketCollection")
+    i.new_socket("Bibliothek_Lauf", in_out="INPUT", socket_type="NodeSocketCollection")
     i.new_socket("Ausschluss", in_out="INPUT", socket_type="NodeSocketCollection")
+    i.new_socket("Lauf_Bibliothek", in_out="INPUT", socket_type="NodeSocketFloat").default_value = 0.0
     for name, wert, typ in [("Dichte", 10.0, "NodeSocketFloat"), ("Mindestabstand", 0.1, "NodeSocketFloat"),
                             ("Ausschluss_Abstand", 0.05, "NodeSocketFloat"), ("Skala_Min", 0.8, "NodeSocketFloat"),
                             ("Skala_Max", 1.2, "NodeSocketFloat"), ("Neigung", 0.1, "NodeSocketFloat"),
@@ -62,6 +64,22 @@ def streuer():
     ci_b.inputs["Separate Children"].default_value = True
     ci_b.inputs["Reset Children"].default_value = True
     Lk.new(gi.outputs["Bibliothek"], ci_b.inputs["Collection"])
+    # leichte Bibliothek für den Modus Laufen (Lauf_Bibliothek > 0.5)
+    ci_c = N.new("GeometryNodeCollectionInfo")
+    ci_c.transform_space = "ORIGINAL"
+    ci_c.inputs["Separate Children"].default_value = True
+    ci_c.inputs["Reset Children"].default_value = True
+    Lk.new(gi.outputs["Bibliothek_Lauf"], ci_c.inputs["Collection"])
+    cmp_l = N.new("FunctionNodeCompare")
+    cmp_l.data_type = "FLOAT"
+    cmp_l.operation = "GREATER_THAN"
+    Lk.new(gi.outputs["Lauf_Bibliothek"], _sock(cmp_l.inputs, "A", "VALUE"))
+    _sock(cmp_l.inputs, "B", "VALUE").default_value = 0.5
+    sw_bib = N.new("GeometryNodeSwitch")
+    sw_bib.input_type = "GEOMETRY"
+    Lk.new(cmp_l.outputs["Result"], sw_bib.inputs["Switch"])
+    Lk.new(ci_b.outputs[0], sw_bib.inputs["False"])
+    Lk.new(ci_c.outputs[0], sw_bib.inputs["True"])
 
     def zufall(typ, mn, mx, plus):
         r = N.new("FunctionNodeRandomValue")
@@ -91,7 +109,7 @@ def streuer():
 
     iop = N.new("GeometryNodeInstanceOnPoints")
     Lk.new(loe.outputs["Geometry"], iop.inputs["Points"])
-    Lk.new(ci_b.outputs[0], iop.inputs["Instance"])
+    Lk.new(sw_bib.outputs[0], iop.inputs["Instance"])
     iop.inputs["Pick Instance"].default_value = True
     Lk.new(zufall("INT", 0, 9999, 5), iop.inputs["Instance Index"])
     Lk.new(rot.outputs[0], iop.inputs["Rotation"])
@@ -110,11 +128,19 @@ def streuer():
 
 
 def anwenden(obj, modname, bibliothek, ausschluss, dichte_lauf, dichte_schoen, abstand=0.1,
-             skala=(0.8, 1.2), neigung=0.1, seed=0, basis=False, ausschluss_abstand=0.05):
+             skala=(0.8, 1.2), neigung=0.1, seed=0, basis=False, ausschluss_abstand=0.05, bibliothek_lauf=None):
+    """bibliothek_lauf: optionale leichte Bibliothek, die im Modus Laufen (m < 0.5) statt 'bibliothek' verwendet wird."""
     ng = bpy.data.node_groups.get(NAME) or streuer()
     mod = obj.modifiers.get(modname) or obj.modifiers.new(modname, "NODES")
     mod.node_group = ng
     gn_setze(mod, "Bibliothek", bpy.data.collections[bibliothek])
+    gn_setze(mod, "Bibliothek_Lauf", bpy.data.collections[bibliothek_lauf or bibliothek])
+    k_lauf = gn_kennung(ng, "Lauf_Bibliothek")
+    if bibliothek_lauf:
+        treiber_modus(obj, f'modifiers["{modname}"]["{k_lauf}"]', "1.0 - m")
+    else:
+        obj.driver_remove(f'modifiers["{modname}"]["{k_lauf}"]')
+        mod[k_lauf] = 0.0
     gn_setze(mod, "Ausschluss", bpy.data.collections[ausschluss])
     gn_setze(mod, "Mindestabstand", float(abstand))
     gn_setze(mod, "Ausschluss_Abstand", float(ausschluss_abstand))

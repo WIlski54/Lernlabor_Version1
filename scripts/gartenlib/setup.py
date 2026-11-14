@@ -13,7 +13,8 @@ SAMMLUNGEN = [
     ("99_Bibliothek", None), ("Bib_Halme", "99_Bibliothek"), ("Bib_Graeser", "99_Bibliothek"),
     ("Bib_Stauden", "99_Bibliothek"), ("Bib_Polster", "99_Bibliothek"), ("Bib_Kiefer", "99_Bibliothek"),
     ("01b_Wiese", "01_Gelaende"), ("01c_Heckenkern", "01_Gelaende"), ("05g_Hecke", "05_Pflanzen"),
-    ("Bib_Heckenblatt", "99_Bibliothek"),
+    ("Bib_Heckenblatt", "99_Bibliothek"), ("Bib_Halme_Lauf", "99_Bibliothek"),
+    ("Bib_Heckenblatt_Lauf", "99_Bibliothek"),
 ]
 
 
