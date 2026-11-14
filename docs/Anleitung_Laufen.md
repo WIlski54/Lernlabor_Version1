@@ -52,6 +52,13 @@ So stellst du um:
 2. Render-Engine auf **Cycles** stellen, Modus **1**.
 3. **F12** drücken. Auf der RTX 4090 dauert ein Bild in 1920 × 1080 rund eine Minute.
 
+## Linien und Umrisse im Bild?
+
+Orange Umrisse (ausgewählte Objekte), gestrichelte Linien (Eltern-Beziehungen) und Lampen-/Kamerasymbole sind
+Blender-Bearbeitungshilfen („Overlays“), nicht Teil der Szene. Ein-/ausschalten: Schaltfläche **Overlays**
+(zwei überlappende Kreise) oben rechts im 3D-Fenster, oder **Shift + Alt + Z**. Auswahl aufheben: **Alt + A**.
+`startansicht()` schaltet beides automatisch ab.
+
 ## Grenzen
 
 - Wände halten dich beim Laufen nicht auf. Blender beachtet nur den Boden.

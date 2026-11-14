@@ -46,12 +46,15 @@ def startansicht(kamera="Kamera_Laufen", modus=0.0):
     sc.render.engine = "BLENDER_EEVEE"
     sc.eevee.shadow_resolution_scale = 0.5 + 0.5 * modus  # nicht per Treiber steuerbar, daher hier
     vorne = cam.matrix_world.to_3x3() @ Vector((0, 0, -1))
+    for o in bpy.context.view_layer.objects:  # keine Auswahl-Umrisse beim Laufen
+        o.select_set(False)
     for fenster in bpy.context.window_manager.windows:
         for bereich in fenster.screen.areas:
             if bereich.type != "VIEW_3D":
                 continue
             raum = bereich.spaces[0]
             raum.shading.type = "RENDERED"
+            raum.overlay.show_overlays = False  # keine Beziehungslinien, Lampen-/Kamerasymbole, Umrisse
             raum.lens = cam.data.lens
             raum.clip_start, raum.clip_end = 0.05, 500.0
             r3d = raum.region_3d
