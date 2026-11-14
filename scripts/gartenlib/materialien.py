@@ -1,0 +1,207 @@
+"""PBR-Materialien aus Poly-Haven-Texturen. Box-Projektion auf Objektkoordinaten (keine UVs nötig)."""
+import glob
+import json
+import os
+
+import bpy
+
+from .util import pfad
+
+TEXTUR_MATS = {
+    "M_Putz": dict(rolle="tex_putz", skala=2.0),
+    "M_Holzfassade": dict(rolle="tex_holzfassade", skala=2.0, vertikal=True),
+    "M_Traufe": dict(rolle="tex_holzfassade", skala=2.0, tint=(0.6, 0.5, 0.42), vertikal=True),
+    "M_Dachblech": dict(rolle="tex_dachblech", skala=1.5, tint=(0.25, 0.25, 0.27)),
+    "M_Dachziegel": dict(rolle="tex_dachziegel", skala=1.5),
+    "M_Holzdeck": dict(rolle="tex_holzdeck", skala=2.0),
+    "M_Trittplatten": dict(rolle="tex_trittstein", skala=1.0, verschiebung=0.005),
+    "M_Weg_Platten": dict(rolle="tex_weg", skala=2.0, tint=(0.45, 0.45, 0.47), rauheit_min=0.6),
+    "M_Polygonalplatten": dict(rolle="tex_steinplatten", skala=2.0, tint=(0.07, 0.07, 0.075), rauheit_min=0.8),
+    "M_Beet": dict(rolle="tex_beet", skala=1.5, tint=(0.45, 0.4, 0.35)),
+    "M_Erde": dict(rolle="tex_beet", skala=1.5, tint=(0.25, 0.32, 0.15)),
+    "M_Rinde_Ahorn": dict(rolle="tex_rinde_ahorn", skala=0.8),
+}
+
+
+def auswahl():
+    with open(pfad("assets", "auswahl.json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _karte(ordner, kennung):
+    for datei in sorted(glob.glob(os.path.join(ordner, "*"))):
+        if kennung in os.path.basename(datei).lower():
+            return datei
+    return None
+
+
+def _sock(sammlung, name, typ):
+    for s in sammlung:
+        if s.name == name and s.type == typ and getattr(s, "enabled", True):
+            return s
+    raise KeyError(f"{name}/{typ}")
+
+
+def mix_farbe(nt, a, b, fac=1.0, art="MIX"):
+    """a, b: Ausgangs-Socket oder RGB-Tupel; fac: Zahl oder Socket. Liefert den Ergebnis-Socket."""
+    n = nt.nodes.new("ShaderNodeMix")
+    n.data_type = "RGBA"
+    n.blend_type = art
+    for name, wert in (("A", a), ("B", b)):
+        s = _sock(n.inputs, name, "RGBA")
+        if isinstance(wert, tuple):
+            s.default_value = (*wert[:3], 1.0)
+        else:
+            nt.links.new(wert, s)
+    f = _sock(n.inputs, "Factor", "VALUE")
+    if isinstance(fac, (int, float)):
+        f.default_value = fac
+    else:
+        nt.links.new(fac, f)
+    return _sock(n.outputs, "Result", "RGBA")
+
+
+def mathe(nt, op, a, b=0.0, c=None):
+    n = nt.nodes.new("ShaderNodeMath")
+    n.operation = op
+    for i, w in enumerate((a, b, c)):
+        if w is None:
+            continue
+        if isinstance(w, (int, float)):
+            n.inputs[i].default_value = w
+        else:
+            nt.links.new(w, n.inputs[i])
+    return n.outputs[0]
+
+
+def _bild(nt, datei, farbe, vektor):
+    n = nt.nodes.new("ShaderNodeTexImage")
+    n.image = bpy.data.images.load(datei, check_existing=True)
+    n.image.colorspace_settings.name = "sRGB" if farbe else "Non-Color"
+    n.projection = "BOX"
+    n.projection_blend = 0.3
+    nt.links.new(vektor, n.inputs["Vector"])
+    return n
+
+
+def _fugen_maske(nt, vektor, art, groesse):
+    """1 = Fuge, 0 = Platte."""
+    if art == "voronoi":
+        v = nt.nodes.new("ShaderNodeTexVoronoi")
+        v.voronoi_dimensions = "2D"
+        v.feature = "DISTANCE_TO_EDGE"
+        v.inputs["Scale"].default_value = 1.0 / groesse
+        v.inputs["Randomness"].default_value = 0.85
+        nt.links.new(vektor, v.inputs["Vector"])
+        mr = nt.nodes.new("ShaderNodeMapRange")
+        mr.inputs["From Min"].default_value = 0.0
+        mr.inputs["From Max"].default_value = 0.015 / groesse
+        mr.inputs["To Min"].default_value = 1.0
+        mr.inputs["To Max"].default_value = 0.0
+        nt.links.new(v.outputs["Distance"], mr.inputs["Value"])
+        return mr.outputs["Result"]
+    b = nt.nodes.new("ShaderNodeTexBrick")
+    b.offset = 0.0
+    b.squash = 1.0
+    b.inputs["Scale"].default_value = 1.0
+    b.inputs["Mortar Size"].default_value = 0.006
+    b.inputs["Mortar Smooth"].default_value = 0.1
+    b.inputs["Brick Width"].default_value = groesse
+    b.inputs["Row Height"].default_value = groesse
+    nt.links.new(vektor, b.inputs["Vector"])
+    return b.outputs["Fac"]
+
+
+def _zell_variation(nt, vektor, groesse):
+    v = nt.nodes.new("ShaderNodeTexVoronoi")
+    v.voronoi_dimensions = "2D"
+    v.inputs["Scale"].default_value = 1.0 / groesse
+    v.inputs["Randomness"].default_value = 0.85
+    nt.links.new(vektor, v.inputs["Vector"])
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["To Min"].default_value = 0.75
+    mr.inputs["To Max"].default_value = 1.2
+    sep = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(v.outputs["Color"], sep.inputs[0])
+    nt.links.new(sep.outputs[0], mr.inputs["Value"])
+    return mr.outputs["Result"]
+
+
+def pbr(name, rolle, skala=1.0, tint=None, vertikal=False, verschiebung=0.0, bump=0.4, fugen=None, fugen_groesse=0.6,
+        rauheit_min=0.0):
+    ordner = pfad("assets", "polyhaven", "textures", auswahl()[rolle])
+    diff = _karte(ordner, "_diff_")
+    if diff is None:
+        raise FileNotFoundError(f"Keine Diffuse-Textur in {ordner}")
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_fake_user = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    aus = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    nt.links.new(bsdf.outputs["BSDF"], aus.inputs["Surface"])
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    obj_vek = tc.outputs["Object"]
+    vek = obj_vek
+    if vertikal:  # Bretter senkrecht: (Z, Z, X+Y) – vertauscht die Achsen auf allen Wandseiten
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(vek, sep.inputs[0])
+        kom = nt.nodes.new("ShaderNodeCombineXYZ")
+        nt.links.new(sep.outputs["Z"], kom.inputs["X"])
+        nt.links.new(sep.outputs["Z"], kom.inputs["Y"])
+        nt.links.new(mathe(nt, "ADD", sep.outputs["X"], sep.outputs["Y"]), kom.inputs["Z"])
+        vek = kom.outputs[0]
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Scale"].default_value = (1.0 / skala,) * 3
+    nt.links.new(vek, mp.inputs["Vector"])
+    vek = mp.outputs["Vector"]
+
+    farbe = _bild(nt, diff, True, vek).outputs["Color"]
+    if tint:
+        farbe = mix_farbe(nt, farbe, tint, 1.0, "MULTIPLY")
+    rough_datei = _karte(ordner, "_rough_")
+    rauheit = _bild(nt, rough_datei, False, vek).outputs["Color"] if rough_datei else 0.7
+    disp_datei = _karte(ordner, "_disp_")
+    hoehe = _bild(nt, disp_datei, False, vek).outputs["Color"] if disp_datei else None
+
+    if fugen:
+        maske = _fugen_maske(nt, obj_vek, fugen, fugen_groesse)
+        if fugen == "voronoi":
+            var = _zell_variation(nt, obj_vek, fugen_groesse)
+            kom = nt.nodes.new("ShaderNodeCombineColor")
+            for i in range(3):
+                nt.links.new(var, kom.inputs[i])
+            farbe = mix_farbe(nt, farbe, kom.outputs[0], 1.0, "MULTIPLY")
+        farbe = mix_farbe(nt, farbe, (0.025, 0.025, 0.025), maske)
+        rauheit = mathe(nt, "MAXIMUM", rauheit, mathe(nt, "MULTIPLY", maske, 0.95))
+        hoehe = mathe(nt, "SUBTRACT", hoehe if hoehe is not None else 0.5, mathe(nt, "MULTIPLY", maske, 0.6))
+
+    if rauheit_min > 0 and not isinstance(rauheit, float):
+        rauheit = mathe(nt, "MAXIMUM", rauheit, rauheit_min)
+    nt.links.new(farbe, bsdf.inputs["Base Color"])
+    if isinstance(rauheit, float):
+        bsdf.inputs["Roughness"].default_value = rauheit
+    else:
+        nt.links.new(rauheit, bsdf.inputs["Roughness"])
+    if hoehe is not None:
+        bp = nt.nodes.new("ShaderNodeBump")
+        bp.inputs["Strength"].default_value = bump
+        bp.inputs["Distance"].default_value = 0.02
+        nt.links.new(hoehe, bp.inputs["Height"])
+        nt.links.new(bp.outputs["Normal"], bsdf.inputs["Normal"])
+        if verschiebung > 0:
+            d = nt.nodes.new("ShaderNodeDisplacement")
+            d.inputs["Midlevel"].default_value = 0.5
+            d.inputs["Scale"].default_value = verschiebung
+            nt.links.new(hoehe, d.inputs["Height"])
+            nt.links.new(d.outputs[0], aus.inputs["Displacement"])
+            m.displacement_method = "BOTH"
+    return m
+
+
+def baue():
+    erg = {}
+    for name, opts in TEXTUR_MATS.items():
+        pbr(name, **opts)
+        erg[name] = "ok"
+    return erg

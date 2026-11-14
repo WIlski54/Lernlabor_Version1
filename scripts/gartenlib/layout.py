@@ -62,23 +62,24 @@ BEETE = {
 }
 
 
-def _mix(graeser=1.0, stauden=1.0, polster=1.0, boden=1.0):
+def _mix(graeser=1.0, stauden=1.0, polster=1.0, kiefer=1.0, boden=1.0):
     """Schichten je Beet: (bibliothek, ziel-collection, dichte_lauf, dichte_schoen, mindestabstand, (skala_min, skala_max))."""
     return [
         ("Bib_Graeser", "05b_Graeser", 0.4 * graeser, 1.0 * graeser, 0.7, (0.8, 1.3)),
-        ("Bib_Stauden", "05c_Stauden", 0.8 * stauden, 2.0 * stauden, 0.35, (0.8, 1.2)),
-        ("Bib_Polster", "05d_Straeucher", 0.1 * polster, 0.25 * polster, 1.3, (0.7, 1.1)),
-        ("Bib_Halme", "05b_Graeser", 15.0 * boden, 60.0 * boden, 0.06, (0.8, 1.5)),
+        ("Bib_Stauden", "05c_Stauden", 1.0 * stauden, 2.5 * stauden, 0.3, (0.8, 1.2)),
+        ("Bib_Polster", "05d_Straeucher", 0.1 * polster, 0.25 * polster, 1.0, (0.6, 1.0)),
+        ("Bib_Kiefer", "05d_Straeucher", 0.15 * kiefer, 0.4 * kiefer, 0.9, (0.8, 1.7)),
+        ("Bib_Halme", "05b_Graeser", 20.0 * boden, 80.0 * boden, 0.06, (0.8, 1.5)),
     ]
 
 
 BEPFLANZUNG = {
-    "Beet_Hof_West": _mix(1.2, 1.0, 0.8),
-    "Beet_Ahorn": _mix(0.6, 1.4, 0.6),
-    "Beet_Vorne": _mix(0.3, 1.2, 1.6),
-    "Beet_Mitte": _mix(0.8, 1.5, 1.4),
-    "Beet_Carport": _mix(1.6, 0.6, 0.5),
-    "Beet_Haus": _mix(1.0, 1.0, 0.8),
+    "Beet_Hof_West": _mix(1.2, 1.0, 0.8, 0.8),
+    "Beet_Ahorn": _mix(0.6, 1.4, 0.6, 1.0),
+    "Beet_Vorne": _mix(0.3, 1.2, 0.6, 2.0),
+    "Beet_Mitte": _mix(0.8, 1.5, 0.6, 2.0),
+    "Beet_Carport": _mix(1.6, 0.6, 0.5, 0.5),
+    "Beet_Haus": _mix(1.0, 1.0, 0.8, 0.8),
 }
 
 # (name, art, ort, zielhöhe, seed)

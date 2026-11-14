@@ -11,7 +11,7 @@ SAMMLUNGEN = [
     ("05f_Kulisse", "05_Pflanzen"), ("06_Licht", None), ("07_Kameras", None),
     ("98_Masken", None), ("Maske_Rasen", "98_Masken"), ("Maske_Beet", "98_Masken"),
     ("99_Bibliothek", None), ("Bib_Halme", "99_Bibliothek"), ("Bib_Graeser", "99_Bibliothek"),
-    ("Bib_Stauden", "99_Bibliothek"), ("Bib_Polster", "99_Bibliothek"),
+    ("Bib_Stauden", "99_Bibliothek"), ("Bib_Polster", "99_Bibliothek"), ("Bib_Kiefer", "99_Bibliothek"),
 ]
 
 

@@ -43,7 +43,7 @@ def hof_platten(m):
         v.co.x *= k
         v.co.y *= k
     o = mesh_aus_bmesh("Hof_Platten", bm, S, mats=[m["platten"]])
-    o.location = (*L.HOF["mitte"], 0.02)
+    o.location = (*L.HOF["mitte"], 0.01)
     s = o.modifiers.new("Dicke", "SOLIDIFY")
     s.thickness = 0.06
     s.offset = -1.0
