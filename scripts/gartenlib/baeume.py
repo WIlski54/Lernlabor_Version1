@@ -23,10 +23,10 @@ ARTEN = {
     },
     "ahorn": {
         "stamm": (0.75, 0.022),
-        "stufen": [(26, 0.28, 55, 0.62, 0.55, 0.05, 0.12),
-                   (9, 0.15, 45, 0.55, 0.55, 0.20, 0.18),
-                   (7, 0.20, 38, 0.50, 0.55, 0.35, 0.22)],
-        "krone": "rund", "blatt": (0.10, 0.11), "blatt_dichte": 120,
+        "stufen": [(24, 0.30, 50, 0.42, 0.55, 0.05, 0.12),
+                   (10, 0.12, 48, 0.55, 0.55, 0.20, 0.18),
+                   (9, 0.15, 42, 0.50, 0.55, 0.35, 0.25)],
+        "krone": "rund", "blatt": (0.065, 0.07), "blatt_dichte": 150,
     },
 }
 
@@ -98,6 +98,7 @@ class _Bauer:
                 t = rnd.uniform(0.25, 1.0)
                 idx = min(int(t * n), n - 1)
                 p = punkte[idx].lerp(punkte[idx + 1], t * n - idx)
+                p += Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * self.a["blatt"][1] * 0.8
                 _blatt(self.laub, self.uv, p, (punkte[idx + 1] - punkte[idx]).normalized(), self.a["blatt"], rnd)
         if stufe >= len(stufen):
             return
@@ -188,9 +189,10 @@ def baue():
     birke_rinde = rinde_birke()
     ahorn_rinde = pbr("M_Rinde_Ahorn", "tex_rinde_ahorn", skala=0.8, tint=(0.45, 0.42, 0.38))
     birke_laub = pflanzen_material("M_Blatt_Birke", [(0.0, (0.05, 0.10, 0.02)), (0.6, (0.10, 0.17, 0.04)),
-                                                     (1.0, (0.20, 0.24, 0.06))], durchscheinend=0.4, alpha_ellipse=True)
-    ahorn_laub = pflanzen_material("M_Blatt_Ahorn", [(0.0, (0.10, 0.12, 0.02)), (0.5, (0.22, 0.22, 0.04)),
-                                                     (1.0, (0.35, 0.30, 0.06))], durchscheinend=0.4, alpha_ellipse=True)
+                                                     (1.0, (0.20, 0.24, 0.06))], durchscheinend=0.4, form="birke")
+    ahorn_laub = pflanzen_material("M_Blatt_Ahorn", [(0.0, (0.12, 0.16, 0.03)), (0.45, (0.25, 0.27, 0.05)),
+                                                     (0.8, (0.38, 0.35, 0.07)), (1.0, (0.45, 0.36, 0.08))],
+                                   durchscheinend=0.5, form="ahorn")
     erg = []
     for name, art, ort, hoehe, seed in L.BAEUME:
         if art == "birke":

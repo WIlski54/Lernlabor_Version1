@@ -24,8 +24,33 @@ def _farbrampe(nt, wert, farben):
     return ramp.outputs["Color"]
 
 
-def pflanzen_material(name, farben, durchscheinend=0.3, rauheit=0.45, spitze=None, alpha_ellipse=False):
-    """farben: [(pos, (r,g,b)), …] über Zufall pro Instanz/Insel; spitze: ((r,g,b), stärke) über Attribut t."""
+def _blattmaske(nt, form):
+    """Alpha-Maske aus UV (u quer, v vom Stiel zur Spitze). form: ellipse | birke | ahorn."""
+    from .materialien import mathe
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["UV"], sep.inputs[0])
+    cx = mathe(nt, "MULTIPLY_ADD", sep.outputs["X"], 2.0, -1.0)            # -1 … 1 quer
+    if form == "birke":  # eiförmig, Spitze ausgezogen
+        breite = mathe(nt, "SINE", mathe(nt, "MULTIPLY", mathe(nt, "POWER", sep.outputs["Y"], 0.7), math.pi))
+        return mathe(nt, "LESS_THAN", mathe(nt, "ABSOLUTE", cx), mathe(nt, "MULTIPLY", breite, 0.95))
+    if form == "ahorn":  # fünf Lappen um die Blattmitte
+        cy = mathe(nt, "MULTIPLY_ADD", sep.outputs["Y"], 2.0, -0.9)
+        r = mathe(nt, "SQRT", mathe(nt, "ADD", mathe(nt, "POWER", cx, 2.0), mathe(nt, "POWER", cy, 2.0)))
+        winkel = mathe(nt, "ARCTAN2", cx, cy)
+        welle = mathe(nt, "ABSOLUTE", mathe(nt, "COSINE", mathe(nt, "MULTIPLY", winkel, 2.5)))
+        lappen = mathe(nt, "MULTIPLY_ADD", mathe(nt, "POWER", welle, 3.0), 0.6, 0.35)  # spitze Lappen, tiefe Buchten
+        return mathe(nt, "LESS_THAN", r, lappen)
+    qx = mathe(nt, "POWER", cx, 2.0)
+    qy = mathe(nt, "POWER", mathe(nt, "MULTIPLY_ADD", sep.outputs["Y"], 2.0, -1.0), 2.0)
+    return mathe(nt, "LESS_THAN", mathe(nt, "ADD", qx, qy), 1.0)
+
+
+def pflanzen_material(name, farben, durchscheinend=0.3, rauheit=0.45, spitze=None, alpha_ellipse=False, form=None):
+    """farben: [(pos, (r,g,b)), …] über Zufall pro Instanz/Insel; spitze: ((r,g,b), stärke) über Attribut t.
+    form: Blattform als Alpha-Maske (ellipse | birke | ahorn); alpha_ellipse=True entspricht form='ellipse'."""
+    if alpha_ellipse and form is None:
+        form = "ellipse"
     from .materialien import mathe, mix_farbe
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     m.use_fake_user = True
@@ -51,13 +76,8 @@ def pflanzen_material(name, farben, durchscheinend=0.3, rauheit=0.45, spitze=Non
     nt.links.new(bsdf.outputs[0], mix.inputs[1])
     nt.links.new(tr.outputs[0], mix.inputs[2])
     ende = mix.outputs[0]
-    if alpha_ellipse:
-        tc = nt.nodes.new("ShaderNodeTexCoord")
-        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
-        nt.links.new(tc.outputs["UV"], sep.inputs[0])
-        qx = mathe(nt, "POWER", mathe(nt, "MULTIPLY_ADD", sep.outputs["X"], 2.0, -1.0), 2.0)
-        qy = mathe(nt, "POWER", mathe(nt, "MULTIPLY_ADD", sep.outputs["Y"], 2.0, -1.0), 2.0)
-        maske = mathe(nt, "LESS_THAN", mathe(nt, "ADD", qx, qy), 1.0)
+    if form:
+        maske = _blattmaske(nt, form)
         trans = nt.nodes.new("ShaderNodeBsdfTransparent")
         mix2 = nt.nodes.new("ShaderNodeMixShader")
         nt.links.new(maske, mix2.inputs["Fac"])
@@ -131,79 +151,108 @@ def rasen():
 
 # ---------------------------------------------------------------- Beete
 
+def _punkt(basis, richtung, hoehe, neigung, t, haengen=0.0):
+    """Punkt auf einem Halm bei t (gleiche Formel wie halm())."""
+    aus = neigung * hoehe * t ** 1.6
+    return Vector((basis[0] + richtung[0] * aus, basis[1] + richtung[1] * aus,
+                   (basis[2] if len(basis) > 2 else 0.0) + hoehe * (t - haengen * t ** 2.5)))
+
+
 def graeser_bibliothek():
+    """Überhängende Grashorste (Lampenputzer-/Chinaschilf-Typ); drei Varianten mit federigen Ähren."""
     leere("Bib_Graeser")
-    m_gras = pflanzen_material("M_Ziergras", [(0.0, (0.06, 0.10, 0.03)), (0.5, (0.14, 0.16, 0.06)),
-                                              (1.0, (0.32, 0.28, 0.14))],
-                               durchscheinend=0.35, spitze=((0.45, 0.40, 0.22), 0.7))
-    m_rispe = pflanzen_material("M_Grasbluete", [(0.0, (0.32, 0.28, 0.20)), (1.0, (0.50, 0.45, 0.35))],
-                                durchscheinend=0.5, rauheit=0.6)
+    m_gras = pflanzen_material("M_Ziergras", [(0.0, (0.05, 0.10, 0.025)), (0.45, (0.11, 0.16, 0.05)),
+                                              (0.8, (0.20, 0.21, 0.09)), (1.0, (0.34, 0.30, 0.15))],
+                               durchscheinend=0.4, spitze=((0.42, 0.38, 0.22), 0.6))
+    m_rispe = pflanzen_material("M_Grasbluete", [(0.0, (0.45, 0.40, 0.32)), (1.0, (0.64, 0.59, 0.49))],
+                                durchscheinend=0.6, rauheit=0.6)
     rnd = random.Random(11)
     for k in range(5):
-        h = rnd.uniform(0.6, 1.3)
+        h = rnd.uniform(0.7, 1.15)
         bm = bmesh.new()
-        for _ in range(rnd.randint(120, 200)):
+        for _ in range(rnd.randint(260, 380)):
             w = rnd.uniform(0, 2 * math.pi)
-            r = 0.12 * math.sqrt(rnd.random())
-            rw = w + rnd.uniform(-0.4, 0.4)
+            r = 0.09 * math.sqrt(rnd.random())
+            rw = w + rnd.uniform(-0.3, 0.3)
+            ng = rnd.uniform(0.35, 1.1)
             halm(bm, (math.cos(w) * r, math.sin(w) * r, 0.0), (math.cos(rw), math.sin(rw)),
-                 h * rnd.uniform(0.6, 1.0), 0.008, rnd.uniform(0.15, 0.7), segmente=6, haengen=rnd.uniform(0.1, 0.35))
-        if k < 2:  # Rispen (Federgras-/Chinaschilf-Optik)
-            for _ in range(rnd.randint(10, 20)):
+                 h * rnd.uniform(0.55, 1.0), 0.006, ng, segmente=8, haengen=rnd.uniform(0.25, 0.6) * ng)
+        if k < 3:  # federige Ähren über dem Horst
+            for _ in range(rnd.randint(18, 32)):
                 w = rnd.uniform(0, 2 * math.pi)
-                r = 0.08 * math.sqrt(rnd.random())
+                r = 0.06 * math.sqrt(rnd.random())
                 basis = (math.cos(w) * r, math.sin(w) * r, 0.0)
                 richtung = (math.cos(w), math.sin(w))
-                hh, ng = h * rnd.uniform(1.05, 1.2), rnd.uniform(0.15, 0.4)
-                for f in halm(bm, basis, richtung, hh, 0.003, ng, segmente=4):
+                hh, ng = h * rnd.uniform(1.05, 1.35), rnd.uniform(0.1, 0.45)
+                for f in halm(bm, basis, richtung, hh, 0.003, ng, segmente=5):
                     f.material_index = 1
-                kopf = _spitze(basis, richtung, hh, ng)
-                for _ in range(rnd.randint(6, 10)):
+                for _ in range(rnd.randint(22, 34)):
+                    p = _punkt(basis, richtung, hh, ng, rnd.uniform(0.72, 1.0))
                     kw = rnd.uniform(0, 2 * math.pi)
-                    for f in halm(bm, (kopf.x, kopf.y, kopf.z - 0.25), (math.cos(kw), math.sin(kw)),
-                                  rnd.uniform(0.18, 0.3), 0.012, 0.15, segmente=3):
+                    for f in halm(bm, (p.x, p.y, p.z), (math.cos(kw), math.sin(kw)),
+                                  rnd.uniform(0.04, 0.08), 0.006, 0.6, segmente=2):
                         f.material_index = 1
         mesh_aus_bmesh(f"Ziergras_{k}", bm, "Bib_Graeser", mats=[m_gras, m_rispe])
 
 
-def _bluete(bm, mitte, r):
-    for i in range(8):
-        a = 2 * math.pi * i / 8
-        p0 = mitte + Vector((math.cos(a - 0.25), math.sin(a - 0.25), 0)) * r * 0.25
-        p1 = mitte + Vector((math.cos(a), math.sin(a), 0.15)) * r
-        p2 = mitte + Vector((math.cos(a + 0.25), math.sin(a + 0.25), 0)) * r * 0.25
-        bm.faces.new([bm.verts.new(p) for p in (mitte, p0, p1, p2)]).material_index = 0
-    ring = [bm.verts.new(mitte + Vector((math.cos(2 * math.pi * j / 6), math.sin(2 * math.pi * j / 6), 0.1)) * r * 0.28)
+def _bluete(bm, mitte, r, rnd):
+    """Schalenblüte mit 9 Blütenblättern, leicht gekippt."""
+    n = Vector((rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), 1.0)).normalized()
+    u = n.cross(Vector((1, 0, 0))).normalized()
+    v = n.cross(u)
+    for i in range(9):
+        a = 2 * math.pi * i / 9 + rnd.uniform(-0.1, 0.1)
+        rr = r * rnd.uniform(0.85, 1.1)
+        rich = lambda w, s: (u * math.cos(w) + v * math.sin(w)) * s
+        pts = [mitte, mitte + rich(a - 0.28, rr * 0.35) + n * rr * 0.05, mitte + rich(a, rr) + n * rr * 0.2,
+               mitte + rich(a + 0.28, rr * 0.35) + n * rr * 0.05]
+        bm.faces.new([bm.verts.new(p) for p in pts]).material_index = 0
+    ring = [bm.verts.new(mitte + (u * math.cos(2 * math.pi * j / 6) + v * math.sin(2 * math.pi * j / 6)) * r * 0.25 + n * r * 0.08)
             for j in range(6)]
     bm.faces.new(ring).material_index = 1
 
 
+def _staudenblatt(bm, b0, d, laenge, breite, hebung):
+    q = Vector((-d.y, d.x, 0))
+    z = Vector((0, 0, 1))
+    pts = [b0, b0 + d * laenge * 0.25 + q * breite * 0.4 + z * hebung * 0.5,
+           b0 + d * laenge * 0.6 + q * breite * 0.5 + z * hebung, b0 + d * laenge + z * hebung * 0.7,
+           b0 + d * laenge * 0.6 - q * breite * 0.5 + z * hebung, b0 + d * laenge * 0.25 - q * breite * 0.4 + z * hebung * 0.5]
+    bm.faces.new([bm.verts.new(p) for p in pts]).material_index = 2
+
+
 def stauden_bibliothek():
+    """Weiß blühende Stauden: Laubhügel plus verzweigte Blütenstiele mit 2–4 Schalenblüten."""
     leere("Bib_Stauden")
-    mats = [pflanzen_material("M_Bluete_Weiss", [(0.0, (0.75, 0.75, 0.72)), (1.0, (0.85, 0.85, 0.82))], durchscheinend=0.4),
-            pflanzen_material("M_Bluete_Mitte", [(0.0, (0.55, 0.40, 0.05)), (1.0, (0.70, 0.55, 0.10))], durchscheinend=0.1),
-            pflanzen_material("M_Staudenblatt", [(0.0, (0.03, 0.07, 0.02)), (1.0, (0.07, 0.12, 0.03))], durchscheinend=0.3)]
+    mats = [pflanzen_material("M_Bluete_Weiss", [(0.0, (0.72, 0.72, 0.68)), (1.0, (0.85, 0.85, 0.82))], durchscheinend=0.45),
+            pflanzen_material("M_Bluete_Mitte", [(0.0, (0.55, 0.42, 0.06)), (1.0, (0.70, 0.55, 0.10))], durchscheinend=0.1),
+            pflanzen_material("M_Staudenblatt", [(0.0, (0.03, 0.075, 0.02)), (1.0, (0.08, 0.14, 0.035))], durchscheinend=0.35)]
     rnd = random.Random(17)
     for k in range(4):
         bm = bmesh.new()
-        for _ in range(rnd.randint(18, 35)):
-            w = rnd.uniform(0, 2 * math.pi)
-            r = 0.1 * math.sqrt(rnd.random())
-            basis = (math.cos(w) * r, math.sin(w) * r, 0.0)
-            richtung = (math.cos(w), math.sin(w))
-            hh, ng = rnd.uniform(0.35, 0.75), rnd.uniform(0.03, 0.15)
-            for f in halm(bm, basis, richtung, hh, 0.004, ng, segmente=3):
-                f.material_index = 2
-            _bluete(bm, _spitze(basis, richtung, hh, ng), rnd.uniform(0.025, 0.035))
-        for _ in range(12):
+        for _ in range(rnd.randint(55, 85)):  # Laubhügel
             w = rnd.uniform(0, 2 * math.pi)
             d = Vector((math.cos(w), math.sin(w), 0))
-            q = Vector((-d.y, d.x, 0))
-            b0 = d * rnd.uniform(0.0, 0.06) + Vector((0, 0, 0.03))
-            laenge = rnd.uniform(0.12, 0.2)
-            pts = [b0, b0 + d * laenge * 0.4 + q * 0.035 + Vector((0, 0, 0.05)),
-                   b0 + d * laenge + Vector((0, 0, 0.04)), b0 + d * laenge * 0.4 - q * 0.035 + Vector((0, 0, 0.05))]
-            bm.faces.new([bm.verts.new(p) for p in pts]).material_index = 2
+            b0 = d * rnd.uniform(0.0, 0.12) + Vector((0, 0, rnd.uniform(0.02, 0.28)))
+            _staudenblatt(bm, b0, d, rnd.uniform(0.12, 0.22), rnd.uniform(0.05, 0.08), rnd.uniform(-0.03, 0.06))
+        for _ in range(rnd.randint(10, 18)):  # Blütenstiele
+            w = rnd.uniform(0, 2 * math.pi)
+            r = 0.08 * math.sqrt(rnd.random())
+            basis = (math.cos(w) * r, math.sin(w) * r, 0.0)
+            richtung = (math.cos(w), math.sin(w))
+            hh, ng = rnd.uniform(0.45, 0.8), rnd.uniform(0.05, 0.25)
+            for f in halm(bm, basis, richtung, hh, 0.004, ng, segmente=4):
+                f.material_index = 2
+            spitze = _spitze(basis, richtung, hh, ng)
+            for _ in range(rnd.randint(2, 4)):
+                ziel = spitze + Vector((rnd.uniform(-0.07, 0.07), rnd.uniform(-0.07, 0.07), rnd.uniform(-0.1, 0.02)))
+                ab = spitze - Vector((0, 0, 0.1))
+                d2 = Vector((ziel.x - ab.x, ziel.y - ab.y, 0))
+                if d2.length > 1e-3:
+                    d2.normalize()
+                    for f in halm(bm, (ab.x, ab.y, ab.z), (d2.x, d2.y), max(ziel.z - ab.z, 0.03), 0.003, 0.6, segmente=2):
+                        f.material_index = 2
+                _bluete(bm, ziel, rnd.uniform(0.03, 0.045), rnd)
         mesh_aus_bmesh(f"Staude_{k}", bm, "Bib_Stauden", mats=mats)
 
 

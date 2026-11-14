@@ -8,7 +8,7 @@ from .materialien import auswahl
 from .util import box, neues_objekt, pfad, treiber_modus
 
 
-def baue(staerke=1.0, drehung_grad=150.0, sonne=1.2, dunst=0.0012):
+def baue(staerke=1.35, drehung_grad=150.0, sonne=1.8, dunst=0.0012):
     datei = glob.glob(pfad("assets", "polyhaven", "hdris", auswahl()["hdri_himmel"], "*.hdr"))[0]
     sc = bpy.context.scene
     w = sc.world or bpy.data.worlds.new("Welt")
