@@ -7,3 +7,5 @@ web/dist/
 server/.venv/
 **/__pycache__/
 docs/
+.git/
+**/node_modules/
